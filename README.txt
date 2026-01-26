@@ -42,3 +42,4 @@ Visit **http://localhost:3000** in your browser.
 4. Upload a PDF, click **Generate Quiz**
 5. Backend extracts text, calls OpenAI, and returns 4 multiple-choice questions
 6. Questions show in the light grey panel on the Generate Quiz page
+
