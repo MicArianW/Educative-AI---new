@@ -1,4 +1,7 @@
 require("dotenv").config();
+console.log("KEY last4:", process.env.OPENAI_API_KEY?.slice(-4));
+console.log("KEY len:", process.env.OPENAI_API_KEY?.length);
+
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
