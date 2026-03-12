@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { AuthProvider, useAuth } from './AuthContext';
 
 // ==================== CONFIG ====================
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -149,6 +150,23 @@ const styles = `
     font-size: 1.1rem;
     color: white;
     box-shadow: var(--shadow-md);
+  }
+
+  .nav-logout-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .nav-logout-btn:hover {
+    border-color: var(--accent-coral);
+    color: var(--accent-coral);
   }
 
   /* Main Content */
@@ -580,6 +598,7 @@ const styles = `
     font-size: 1.1rem;
     text-align: left;
     box-shadow: var(--shadow-sm);
+    font-family: 'Outfit', sans-serif;
   }
 
   .answer-option:hover:not(.disabled) {
@@ -819,6 +838,171 @@ const styles = `
     font-weight: 600;
   }
 
+  /* Auth Styles */
+  .auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .auth-card {
+    background: white;
+    border-radius: 24px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .auth-tabs {
+    display: flex;
+    margin-bottom: 30px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid var(--accent-cyan);
+  }
+
+  .auth-tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .auth-tab.active {
+    background: var(--gradient-main);
+    color: white;
+  }
+
+  .auth-tab.inactive {
+    background: white;
+    color: var(--accent-cyan);
+  }
+
+  .auth-features {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .auth-features-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 15px;
+  }
+
+  .auth-features-list {
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .auth-feature {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .auth-feature-icon {
+    font-size: 24px;
+    margin-bottom: 5px;
+  }
+
+  /* Dashboard Styles */
+  .dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
+  .dashboard-stat-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+  }
+
+  .dashboard-stat-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+  }
+
+  .dashboard-stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .dashboard-stat-label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+
+  .dashboard-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-tab {
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .dashboard-tab.active {
+    background: var(--gradient-main);
+    color: white;
+  }
+
+  .dashboard-tab.inactive {
+    background: white;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .dashboard-content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+  }
+
+  .game-item {
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--bg-input);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .topic-chip {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--accent-cyan);
+    margin: 5px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
   /* Loading States */
   .loading-container {
     display: flex;
@@ -903,6 +1087,7 @@ const styles = `
   /* Responsive */
   @media (max-width: 1200px) {
     .live-scoreboard { display: none; }
+    .dashboard-content-grid { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 768px) {
@@ -933,56 +1118,279 @@ function connectSocket() {
 // ==================== COMPONENTS ====================
 
 // Navigation
-const Navbar = ({ user, onLogoClick }) => (
+const Navbar = ({ user, authUser, onLogoClick, onLogout }) => (
   <nav className="navbar">
     <div className="logo" onClick={onLogoClick}>
       <div className="logo-icon">🧠</div>
       EDUCATIVE AI
     </div>
-    {user && (
-      <div className="nav-user">
-        <span className="user-name">{user.name}</span>
-        <div className="user-avatar" style={{ background: user.color || 'var(--gradient-main)' }}>
-          {user.avatar}
-        </div>
-      </div>
-    )}
+    <div className="nav-user">
+      {user && (
+        <>
+          <span className="user-name">{user.name}</span>
+          <div className="user-avatar" style={{ background: user.color || 'var(--gradient-main)' }}>
+            {user.avatar}
+          </div>
+        </>
+      )}
+      {authUser && !user && (
+        <>
+          <span className="user-name">{authUser.username}</span>
+          <div className="user-avatar" style={{ background: 'var(--gradient-main)' }}>
+            {authUser.username?.charAt(0).toUpperCase()}
+          </div>
+        </>
+      )}
+      {authUser && (
+        <button className="nav-logout-btn" onClick={onLogout}>
+          Logout
+        </button>
+      )}
+    </div>
   </nav>
 );
 
-// Home Screen - Choose Create or Join
-const HomeScreen = ({ onCreateGame, onJoinGame }) => (
-  <div className="container-sm">
-    <div className="page-header">
-      <h1 className="page-title">🧠 Educative AI</h1>
-      <p className="page-subtitle">Challenge your friends to AI-powered quiz battles!</p>
-    </div>
+// Auth Screen - Login/Register
+const AuthScreen = ({ onAuthSuccess }) => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    <div className="card" style={{ marginBottom: '20px', cursor: 'pointer' }} onClick={onCreateGame}>
-      <div style={{ textAlign: 'center', padding: '24px 0' }}>
-        <div style={{ fontSize: '4.5rem', marginBottom: '20px' }}>🎯</div>
-        <h3 className="card-title">Create Game</h3>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Upload a PDF and invite friends to compete
-        </p>
+  const { login, register } = useAuth();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        await login(email, password);
+      } else {
+        await register(email, password, username);
+      }
+      onAuthSuccess();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '10px' }}>🧠</div>
+          <h1 className="page-title" style={{ fontSize: '1.8rem', marginBottom: '5px' }}>Educative AI</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Learn together, compete, and grow</p>
+        </div>
+
+        <div className="auth-tabs">
+          <button className={`auth-tab ${isLogin ? 'active' : 'inactive'}`} onClick={() => setIsLogin(true)}>
+            Sign In
+          </button>
+          <button className={`auth-tab ${!isLogin ? 'active' : 'inactive'}`} onClick={() => setIsLogin(false)}>
+            Sign Up
+          </button>
+        </div>
+
+        {error && <div className="error-message">{error}</div>}
+
+        <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <div className="input-group">
+              <label className="input-label">Username</label>
+              <input type="text" className="input" placeholder="Enter your username" value={username} onChange={(e) => setUsername(e.target.value)} required={!isLogin} minLength={2} maxLength={50} />
+            </div>
+          )}
+          <div className="input-group">
+            <label className="input-label">Email</label>
+            <input type="email" className="input" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Password</label>
+            <input type="password" className="input" placeholder={isLogin ? "Enter your password" : "Create a password (8+ chars)"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={isLogin ? 1 : 8} />
+          </div>
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading}>
+            {loading ? '...' : (isLogin ? 'Sign In' : 'Create Account')}
+          </button>
+        </form>
+
+        <div className="auth-features">
+          <p className="auth-features-title">Why join Educative AI?</p>
+          <div className="auth-features-list">
+            <div className="auth-feature"><div className="auth-feature-icon">📚</div><div>AI Quizzes</div></div>
+            <div className="auth-feature"><div className="auth-feature-icon">🎮</div><div>Multiplayer</div></div>
+            <div className="auth-feature"><div className="auth-feature-icon">📊</div><div>Track Progress</div></div>
+            <div className="auth-feature"><div className="auth-feature-icon">🏆</div><div>Leaderboard</div></div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+};
 
-    <div className="card" style={{ cursor: 'pointer' }} onClick={onJoinGame}>
-      <div style={{ textAlign: 'center', padding: '24px 0' }}>
-        <div style={{ fontSize: '4.5rem', marginBottom: '20px' }}>🚀</div>
-        <h3 className="card-title">Join Game</h3>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Enter a code to join a friend's game
-        </p>
+// Dashboard Screen
+const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
+  const { user: authUser, token } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [gamesPlayed, setGamesPlayed] = useState([]);
+  const [gamesCreated, setGamesCreated] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [statsRes, playedRes, createdRes, topicsRes, leaderboardRes] = await Promise.all([
+        fetch(`${API_URL}/dashboard/stats`, { headers }),
+        fetch(`${API_URL}/dashboard/games-played?limit=5`, { headers }),
+        fetch(`${API_URL}/dashboard/games-created?limit=5`, { headers }),
+        fetch(`${API_URL}/dashboard/topics`, { headers }),
+        fetch(`${API_URL}/dashboard/leaderboard?limit=10`)
+      ]);
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (playedRes.ok) setGamesPlayed((await playedRes.json()).games || []);
+      if (createdRes.ok) setGamesCreated((await createdRes.json()).games || []);
+      if (topicsRes.ok) setTopics((await topicsRes.json()).topics || []);
+      if (leaderboardRes.ok) setLeaderboard((await leaderboardRes.json()).leaderboard || []);
+    } catch (error) {
+      console.error('Failed to fetch dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="loading-container"><div className="loading-spinner"></div><div className="loading-text">Loading your dashboard...</div></div>;
+  }
+
+  return (
+    <div className="container" style={{ paddingTop: '30px' }}>
+      <div style={{ marginBottom: '30px' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '8px' }}>Welcome back, {authUser?.username}! 👋</h1>
+        <p style={{ color: 'var(--text-secondary)' }}>Here's your learning progress at a glance</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '15px', marginBottom: '30px' }}>
+        <button className="btn btn-primary btn-lg" onClick={onCreateGame}>➕ Create Quiz Game</button>
+        <button className="btn btn-secondary btn-lg" onClick={onJoinGame}>🎮 Join Game</button>
+      </div>
+
+      <div className="dashboard-stats-grid">
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">🏆</div><div className="dashboard-stat-value">{stats?.totalPoints || 0}</div><div className="dashboard-stat-label">Total Points</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">🎮</div><div className="dashboard-stat-value">{stats?.gamesPlayed || 0}</div><div className="dashboard-stat-label">Games Played</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">🥇</div><div className="dashboard-stat-value">{stats?.gamesWon || 0}</div><div className="dashboard-stat-label">Games Won</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">📝</div><div className="dashboard-stat-value">{stats?.gamesHosted || 0}</div><div className="dashboard-stat-label">Games Hosted</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">🎯</div><div className="dashboard-stat-value">{stats?.accuracy || 0}%</div><div className="dashboard-stat-label">Accuracy</div></div>
+        <div className="dashboard-stat-card"><div className="dashboard-stat-icon">📚</div><div className="dashboard-stat-value">{stats?.topicsStudied || 0}</div><div className="dashboard-stat-label">Topics Studied</div></div>
+      </div>
+
+      <div className="dashboard-tabs">
+        {['overview', 'games-created', 'games-played', 'leaderboard'].map((tab) => (
+          <button key={tab} className={`dashboard-tab ${activeTab === tab ? 'active' : 'inactive'}`} onClick={() => setActiveTab(tab)}>
+            {tab === 'overview' && '📊 Overview'}{tab === 'games-created' && '📝 Games Created'}{tab === 'games-played' && '🎮 Games Played'}{tab === 'leaderboard' && '🏆 Leaderboard'}
+          </button>
+        ))}
+      </div>
+
+      <div className="dashboard-content-grid">
+        <div>
+          {activeTab === 'overview' && (
+            <>
+              <div className="card" style={{ marginBottom: '20px' }}>
+                <h3 className="card-title">🎮 Recent Games</h3>
+                {gamesPlayed.length > 0 ? gamesPlayed.map((game, idx) => (
+                  <div key={idx} className="game-item">
+                    <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic}</div></div>
+                    <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
+                  </div>
+                )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No games played yet. Join a game to get started!</p>}
+              </div>
+              <div className="card">
+                <h3 className="card-title">📚 Topics Studied</h3>
+                {topics.length > 0 ? <div>{topics.map((topic, idx) => <span key={idx} className="topic-chip">{topic.topic} ({topic.games_count})</span>)}</div> : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Complete some quizzes to see your topics here!</p>}
+              </div>
+            </>
+          )}
+          {activeTab === 'games-created' && (
+            <div className="card">
+              <h3 className="card-title">📝 Games You Created</h3>
+              {gamesCreated.length > 0 ? gamesCreated.map((game, idx) => (
+                <div key={idx} className="game-item">
+                  <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Code: {game.game_code}</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '600', color: game.status === 'finished' ? 'var(--success)' : 'var(--accent-gold)' }}>{game.status}</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.player_count} players</div></div>
+                </div>
+              )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>You haven't created any games yet.</p>}
+            </div>
+          )}
+          {activeTab === 'games-played' && (
+            <div className="card">
+              <h3 className="card-title">🎮 Game History</h3>
+              {gamesPlayed.length > 0 ? gamesPlayed.map((game, idx) => (
+                <div key={idx} className="game-item">
+                  <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Rank: #{game.final_rank || '-'}</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
+                </div>
+              )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No games in your history yet.</p>}
+            </div>
+          )}
+          {activeTab === 'leaderboard' && (
+            <div className="card">
+              <h3 className="card-title">🏆 Global Leaderboard</h3>
+              {leaderboard.map((player, idx) => (
+                <div key={idx} className={`scoreboard-player ${player.id === authUser?.id ? 'you' : ''} ${idx === 0 ? 'first' : ''}`}>
+                  <span className={`scoreboard-rank ${idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''}`}>#{idx + 1}</span>
+                  <div className="scoreboard-avatar" style={{ background: 'var(--gradient-main)' }}>{player.username?.charAt(0).toUpperCase()}</div>
+                  <span className="scoreboard-name">{player.username} {player.id === authUser?.id && '(You)'}</span>
+                  <span className="scoreboard-score">{player.total_points}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <h3 className="card-title">📈 Your Rank</h3>
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>{stats?.rank === 1 ? '🥇' : stats?.rank === 2 ? '🥈' : stats?.rank === 3 ? '🥉' : '🏅'}</div>
+              <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--accent-cyan)' }}>#{stats?.rank || '-'}</div>
+              <div style={{ color: 'var(--text-muted)', marginTop: '5px' }}>Global Rank</div>
+            </div>
+          </div>
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <h3 className="card-title">📊 Win Rate</h3>
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{ fontSize: '48px', fontWeight: '700', color: 'var(--success)' }}>{stats?.winRate || 0}%</div>
+              <div style={{ color: 'var(--text-muted)', marginTop: '5px' }}>{stats?.gamesWon || 0} / {stats?.gamesPlayed || 0} games won</div>
+            </div>
+          </div>
+          <div className="card">
+            <h3 className="card-title">🎯 Accuracy</h3>
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{ fontSize: '48px', fontWeight: '700', color: 'var(--accent-blue)' }}>{stats?.accuracy || 0}%</div>
+              <div style={{ color: 'var(--text-muted)', marginTop: '5px' }}>{stats?.correctAnswers || 0} / {stats?.totalAnswers || 0} correct</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Create Game Screen
-const CreateGameScreen = ({ onBack, onGameCreated }) => {
-  const [hostName, setHostName] = useState('');
+const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
+  const [hostName, setHostName] = useState(authUser?.username || '');
   const [gameName, setGameName] = useState('');
   const [pdfFile, setPdfFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -991,251 +1399,92 @@ const CreateGameScreen = ({ onBack, onGameCreated }) => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      setPdfFile(file);
-      setError('');
-    } else {
-      setError('Please select a valid PDF file');
-    }
+    if (file && file.type === 'application/pdf') { setPdfFile(file); setError(''); }
+    else { setError('Please select a valid PDF file'); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!hostName.trim() || !gameName.trim() || !pdfFile) {
-      setError('Please fill in all fields and upload a PDF');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+    if (!hostName.trim() || !gameName.trim() || !pdfFile) { setError('Please fill in all fields and upload a PDF'); return; }
+    setLoading(true); setError('');
     try {
       const formData = new FormData();
       formData.append('hostName', hostName.trim());
       formData.append('gameName', gameName.trim());
       formData.append('pdf', pdfFile);
-
-      const response = await fetch(`${API_URL}/game/create`, {
-        method: 'POST',
-        body: formData,
-      });
-
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(`${API_URL}/game/create`, { method: 'POST', headers, body: formData });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create game');
-      }
-
-      onGameCreated({
-        ...data,
-        name: hostName.trim(),
-        avatar: hostName.trim().charAt(0).toUpperCase(),
-        isHost: true,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      if (!response.ok) throw new Error(data.error || 'Failed to create game');
+      onGameCreated({ ...data, name: hostName.trim(), avatar: hostName.trim().charAt(0).toUpperCase(), isHost: true });
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   return (
     <div className="container-sm">
-      <div className="page-header">
-        <h1 className="page-title">Create Game</h1>
-        <p className="page-subtitle">Upload your study material and challenge friends</p>
-      </div>
-
+      <div className="page-header"><h1 className="page-title">Create Game</h1><p className="page-subtitle">Upload your study material and challenge friends</p></div>
       <div className="card">
         {error && <div className="error-message">{error}</div>}
-
         <form onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label className="input-label">Your Name</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="Enter your name"
-              value={hostName}
-              onChange={(e) => setHostName(e.target.value)}
-              maxLength={20}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Game Name</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="e.g., Biology Chapter 5 Quiz"
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
-              maxLength={50}
-              disabled={loading}
-            />
-          </div>
-
+          <div className="input-group"><label className="input-label">Your Name</label><input type="text" className="input" placeholder="Enter your name" value={hostName} onChange={(e) => setHostName(e.target.value)} maxLength={20} disabled={loading} /></div>
+          <div className="input-group"><label className="input-label">Game Name</label><input type="text" className="input" placeholder="e.g., Biology Chapter 5 Quiz" value={gameName} onChange={(e) => setGameName(e.target.value)} maxLength={50} disabled={loading} /></div>
           <div className="input-group">
             <label className="input-label">Upload Study Material (PDF)</label>
-            <div
-              className={`file-upload ${pdfFile ? 'has-file' : ''}`}
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <div className={`file-upload ${pdfFile ? 'has-file' : ''}`} onClick={() => fileInputRef.current?.click()}>
               <div className="file-upload-icon">{pdfFile ? '✅' : '📄'}</div>
-              <div className="file-upload-text">
-                {pdfFile ? 'PDF Selected!' : 'Click to upload PDF'}
-              </div>
-              <div className="file-upload-hint">
-                AI will generate quiz questions from this document
-              </div>
+              <div className="file-upload-text">{pdfFile ? 'PDF Selected!' : 'Click to upload PDF'}</div>
+              <div className="file-upload-hint">AI will generate quiz questions from this document</div>
               {pdfFile && <div className="file-name">{pdfFile.name}</div>}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                disabled={loading}
-              />
+              <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileChange} style={{ display: 'none' }} disabled={loading} />
             </div>
           </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary btn-lg btn-block"
-            disabled={loading || !hostName.trim() || !gameName.trim() || !pdfFile}
-          >
-            {loading ? (
-              <>
-                <span className="loading-spinner" style={{ width: 20, height: 20, marginBottom: 0, borderWidth: 3 }}></span>
-                Generating Questions...
-              </>
-            ) : (
-              <>🎮 Create Game</>
-            )}
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading || !hostName.trim() || !gameName.trim() || !pdfFile}>
+            {loading ? <><span className="loading-spinner" style={{ width: 20, height: 20, marginBottom: 0, borderWidth: 3 }}></span>Generating Questions...</> : <>🎮 Create Game</>}
           </button>
         </form>
-
-        <button
-          className="btn btn-secondary btn-block"
-          style={{ marginTop: '16px' }}
-          onClick={onBack}
-          disabled={loading}
-        >
-          ← Back
-        </button>
+        <button className="btn btn-secondary btn-block" style={{ marginTop: '16px' }} onClick={onBack} disabled={loading}>← Back</button>
       </div>
     </div>
   );
 };
 
 // Join Game Screen
-const JoinGameScreen = ({ onBack, onGameJoined }) => {
-  const [playerName, setPlayerName] = useState('');
+const JoinGameScreen = ({ onBack, onGameJoined, authUser }) => {
+  const [playerName, setPlayerName] = useState(authUser?.username || '');
   const [gameCode, setGameCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!playerName.trim() || gameCode.length !== 6) {
-      setError('Please enter your name and a valid 6-character game code');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+    if (!playerName.trim() || gameCode.length !== 6) { setError('Please enter your name and a valid 6-character game code'); return; }
+    setLoading(true); setError('');
     try {
-      const response = await fetch(`${API_URL}/game/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameCode.toUpperCase(),
-          playerName: playerName.trim(),
-        }),
-      });
-
+      const response = await fetch(`${API_URL}/game/join`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: gameCode.toUpperCase(), playerName: playerName.trim() }) });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to join game');
-      }
-
-      onGameJoined({
-        ...data,
-        name: playerName.trim(),
-        avatar: playerName.trim().charAt(0).toUpperCase(),
-        isHost: false,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      if (!response.ok) throw new Error(data.error || 'Failed to join game');
+      onGameJoined({ ...data, name: playerName.trim(), avatar: playerName.trim().charAt(0).toUpperCase(), isHost: false });
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   return (
     <div className="container-sm">
-      <div className="page-header">
-        <h1 className="page-title">Join Game</h1>
-        <p className="page-subtitle">Enter the code shared by your friend</p>
-      </div>
-
+      <div className="page-header"><h1 className="page-title">Join Game</h1><p className="page-subtitle">Enter the code shared by your friend</p></div>
       <div className="card">
         {error && <div className="error-message">{error}</div>}
-
         <form onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label className="input-label">Your Name</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              maxLength={20}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="input-group">
-            <label className="input-label">Game Code</label>
-            <input
-              type="text"
-              className="input input-code"
-              placeholder="ABC123"
-              value={gameCode}
-              onChange={(e) => setGameCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-              maxLength={6}
-              disabled={loading}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary btn-lg btn-block"
-            disabled={loading || !playerName.trim() || gameCode.length !== 6}
-          >
-            {loading ? 'Joining...' : '🚀 Join Game'}
-          </button>
+          <div className="input-group"><label className="input-label">Your Name</label><input type="text" className="input" placeholder="Enter your name" value={playerName} onChange={(e) => setPlayerName(e.target.value)} maxLength={20} disabled={loading} /></div>
+          <div className="input-group"><label className="input-label">Game Code</label><input type="text" className="input input-code" placeholder="ABC123" value={gameCode} onChange={(e) => setGameCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} maxLength={6} disabled={loading} /></div>
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading || !playerName.trim() || gameCode.length !== 6}>{loading ? 'Joining...' : '🚀 Join Game'}</button>
         </form>
-
-        <button
-          className="btn btn-secondary btn-block"
-          style={{ marginTop: '16px' }}
-          onClick={onBack}
-          disabled={loading}
-        >
-          ← Back
-        </button>
+        <button className="btn btn-secondary btn-block" style={{ marginTop: '16px' }} onClick={onBack} disabled={loading}>← Back</button>
       </div>
     </div>
   );
 };
 
-// Game Lobby - Waiting for players
+// Game Lobby
 const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
   const [gameState, setGameState] = useState(null);
   const [isReady, setIsReady] = useState(user.isHost);
@@ -1243,135 +1492,36 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
 
   useEffect(() => {
     const socket = connectSocket();
-
-    // Join the socket room
-    socket.emit('joinRoom', {
-      gameId: gameData.gameId,
-      playerId: gameData.playerId,
-    });
-
-    // Listen for game state updates
-    socket.on('gameState', (state) => {
-      setGameState(state);
-    });
-
-    socket.on('gameStarted', () => {
-      onStartGame();
-    });
-
-    socket.on('error', (err) => {
-      console.error('Socket error:', err);
-    });
-
-    return () => {
-      socket.off('gameState');
-      socket.off('gameStarted');
-      socket.off('error');
-    };
+    socket.emit('joinRoom', { gameId: gameData.gameId, playerId: gameData.playerId });
+    socket.on('gameState', (state) => setGameState(state));
+    socket.on('gameStarted', () => onStartGame());
+    socket.on('error', (err) => console.error('Socket error:', err));
+    return () => { socket.off('gameState'); socket.off('gameStarted'); socket.off('error'); };
   }, [gameData.gameId, gameData.playerId, onStartGame]);
 
-  const handleReady = () => {
-    const newReady = !isReady;
-    setIsReady(newReady);
-    socket.emit('playerReady', {
-      gameId: gameData.gameId,
-      playerId: gameData.playerId,
-      ready: newReady,
-    });
-  };
-
-  const handleStart = () => {
-    socket.emit('startGame', {
-      gameId: gameData.gameId,
-      playerId: gameData.playerId,
-    });
-  };
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(gameData.gameId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
+  const handleReady = () => { const newReady = !isReady; setIsReady(newReady); socket.emit('playerReady', { gameId: gameData.gameId, playerId: gameData.playerId, ready: newReady }); };
+  const handleStart = () => { socket.emit('startGame', { gameId: gameData.gameId, playerId: gameData.playerId }); };
+  const copyCode = () => { navigator.clipboard.writeText(gameData.gameId); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const players = gameState?.players || gameData.players || [];
-
-  // Color palette for players
   const playerColors = ['#06b6d4', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899'];
 
   return (
     <div className="container-sm">
-      <div className="lobby-info">
-        <h1 className="lobby-title">{gameData.gameName}</h1>
-        <p className="lobby-topic">📚 {gameData.topic}</p>
-        <p style={{ color: 'var(--text-muted)', marginTop: '8px', fontWeight: '500' }}>
-          {gameData.totalQuestions} questions
-        </p>
-      </div>
-
-      <div className="game-code-display">
-        <div className="game-code">{gameData.gameId}</div>
-        <div className="game-code-label">Share this code with friends</div>
-        <button
-          className="btn btn-secondary"
-          style={{ marginTop: '20px' }}
-          onClick={copyCode}
-        >
-          {copied ? '✓ Copied!' : '📋 Copy Code'}
-        </button>
-      </div>
-
+      <div className="lobby-info"><h1 className="lobby-title">{gameData.gameName}</h1><p className="lobby-topic">📚 {gameData.topic}</p><p style={{ color: 'var(--text-muted)', marginTop: '8px', fontWeight: '500' }}>{gameData.totalQuestions} questions</p></div>
+      <div className="game-code-display"><div className="game-code">{gameData.gameId}</div><div className="game-code-label">Share this code with friends</div><button className="btn btn-secondary" style={{ marginTop: '20px' }} onClick={copyCode}>{copied ? '✓ Copied!' : '📋 Copy Code'}</button></div>
       <div className="card">
-        <h3 className="card-title" style={{ marginBottom: '20px', textAlign: 'center' }}>
-          👥 Players ({players.length})
-        </h3>
-
+        <h3 className="card-title" style={{ marginBottom: '20px', textAlign: 'center' }}>👥 Players ({players.length})</h3>
         <div className="players-grid">
           {players.map((player, index) => (
-            <div
-              key={player.id}
-              className={`player-card ${player.isHost ? 'host' : ''} ${player.isReady ? 'ready' : ''}`}
-            >
-              <div
-                className="player-avatar"
-                style={{ background: player.color || playerColors[index % playerColors.length] }}
-              >
-                {player.avatar}
-              </div>
-              <div className="player-name">
-                {player.name}
-                {player.id === gameData.playerId && ' (You)'}
-              </div>
-              <div className={`player-status ${player.isHost ? 'host' : player.isReady ? 'ready' : ''}`}>
-                {player.isHost ? '👑 Host' : player.isReady ? '✓ Ready' : '⏳ Waiting...'}
-              </div>
+            <div key={player.id} className={`player-card ${player.isHost ? 'host' : ''} ${player.isReady ? 'ready' : ''}`}>
+              <div className="player-avatar" style={{ background: player.color || playerColors[index % playerColors.length] }}>{player.avatar}</div>
+              <div className="player-name">{player.name}{player.id === gameData.playerId && ' (You)'}</div>
+              <div className={`player-status ${player.isHost ? 'host' : player.isReady ? 'ready' : ''}`}>{player.isHost ? '👑 Host' : player.isReady ? '✓ Ready' : '⏳ Waiting...'}</div>
             </div>
           ))}
         </div>
-
-        {user.isHost ? (
-          <button
-            className="btn btn-primary btn-lg btn-block"
-            onClick={handleStart}
-            disabled={players.length < 1}
-          >
-            🎮 Start Game
-          </button>
-        ) : (
-          <button
-            className={`btn ${isReady ? 'btn-secondary' : 'btn-primary'} btn-lg btn-block`}
-            onClick={handleReady}
-          >
-            {isReady ? '✓ Ready!' : '✋ Ready Up'}
-          </button>
-        )}
-
-        <button
-          className="btn btn-secondary btn-block"
-          style={{ marginTop: '12px' }}
-          onClick={onLeave}
-        >
-          Leave Game
-        </button>
+        {user.isHost ? <button className="btn btn-primary btn-lg btn-block" onClick={handleStart} disabled={players.length < 1}>🎮 Start Game</button> : <button className={`btn ${isReady ? 'btn-secondary' : 'btn-primary'} btn-lg btn-block`} onClick={handleReady}>{isReady ? '✓ Ready!' : '✋ Ready Up'}</button>}
+        <button className="btn btn-secondary btn-block" style={{ marginTop: '12px' }} onClick={onLeave}>Leave Game</button>
       </div>
     </div>
   );
@@ -1380,22 +1530,8 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
 // Game Countdown
 const GameCountdown = ({ onComplete }) => {
   const [count, setCount] = useState(3);
-
-  useEffect(() => {
-    if (count > 0) {
-      const timer = setTimeout(() => setCount(count - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      onComplete();
-    }
-  }, [count, onComplete]);
-
-  return (
-    <div className="countdown-overlay">
-      <div className="countdown-number">{count || 'GO!'}</div>
-      <div className="countdown-text">Get Ready!</div>
-    </div>
-  );
+  useEffect(() => { if (count > 0) { const timer = setTimeout(() => setCount(count - 1), 1000); return () => clearTimeout(timer); } else { onComplete(); } }, [count, onComplete]);
+  return <div className="countdown-overlay"><div className="countdown-number">{count || 'GO!'}</div><div className="countdown-text">Get Ready!</div></div>;
 };
 
 // Active Quiz Game
@@ -1413,224 +1549,82 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
 
   useEffect(() => {
     const socket = connectSocket();
-
-    socket.on('question', (data) => {
-      setCurrentQuestion(data);
-      setQuestionIndex(data.index);
-      setTotalQuestions(data.total);
-      setSelectedAnswer(null);
-      setAnswerResult(null);
-      setTimeLeft(data.timeLimit || 30);
-    });
-
-    socket.on('answerResult', (result) => {
-      setAnswerResult(result);
-      setScore(result.totalScore);
-    });
-
-    socket.on('questionEnded', (data) => {
-      if (!answerResult) {
-        setAnswerResult({
-          correct: false,
-          correctIndex: data.correctIndex,
-          points: 0,
-        });
-      }
-    });
-
-    socket.on('gameState', (state) => {
-      setPlayers(state.players || []);
-    });
-
-    socket.on('gameFinished', (data) => {
-      onGameEnd(data.results);
-    });
-
-    return () => {
-      socket.off('question');
-      socket.off('answerResult');
-      socket.off('questionEnded');
-      socket.off('gameState');
-      socket.off('gameFinished');
-    };
+    socket.on('question', (data) => { setCurrentQuestion(data); setQuestionIndex(data.index); setTotalQuestions(data.total); setSelectedAnswer(null); setAnswerResult(null); setTimeLeft(data.timeLimit || 30); });
+    socket.on('answerResult', (result) => { setAnswerResult(result); setScore(result.totalScore); });
+    socket.on('questionEnded', (data) => { if (!answerResult) setAnswerResult({ correct: false, correctIndex: data.correctIndex, points: 0 }); });
+    socket.on('gameState', (state) => setPlayers(state.players || []));
+    socket.on('gameFinished', (data) => onGameEnd(data.results));
+    return () => { socket.off('question'); socket.off('answerResult'); socket.off('questionEnded'); socket.off('gameState'); socket.off('gameFinished'); };
   }, [onGameEnd, answerResult]);
 
-  // Timer
   useEffect(() => {
     if (showCountdown || !currentQuestion || answerResult) return;
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          // Notify server time's up
-          socket.emit('timeUp', {
-            gameId: gameData.gameId,
-            questionIndex: questionIndex,
-          });
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
+    timerRef.current = setInterval(() => { setTimeLeft((prev) => { if (prev <= 1) { clearInterval(timerRef.current); socket.emit('timeUp', { gameId: gameData.gameId, questionIndex: questionIndex }); return 0; } return prev - 1; }); }, 1000);
     return () => clearInterval(timerRef.current);
   }, [currentQuestion, showCountdown, answerResult, gameData.gameId, questionIndex]);
 
   const handleAnswer = (answerIndex) => {
     if (selectedAnswer !== null || answerResult) return;
-
-    setSelectedAnswer(answerIndex);
-    clearInterval(timerRef.current);
-
-    socket.emit('submitAnswer', {
-      gameId: gameData.gameId,
-      playerId: gameData.playerId,
-      questionIndex: questionIndex,
-      answerIndex: answerIndex,
-    });
+    setSelectedAnswer(answerIndex); clearInterval(timerRef.current);
+    socket.emit('submitAnswer', { gameId: gameData.gameId, playerId: gameData.playerId, questionIndex: questionIndex, answerIndex: answerIndex });
   };
 
-  if (showCountdown) {
-    return <GameCountdown onComplete={() => setShowCountdown(false)} />;
-  }
-
-  if (!currentQuestion) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <div className="loading-text">Waiting for question...</div>
-      </div>
-    );
-  }
+  if (showCountdown) return <GameCountdown onComplete={() => setShowCountdown(false)} />;
+  if (!currentQuestion) return <div className="loading-container"><div className="loading-spinner"></div><div className="loading-text">Waiting for question...</div></div>;
 
   const getOptionClass = (idx) => {
     let className = 'answer-option';
-    if (answerResult) {
-      className += ' disabled';
-      if (idx === answerResult.correctIndex) {
-        className += ' correct';
-      } else if (idx === selectedAnswer && !answerResult.correct) {
-        className += ' incorrect';
-      }
-    } else if (selectedAnswer === idx) {
-      className += ' selected';
-    }
+    if (answerResult) { className += ' disabled'; if (idx === answerResult.correctIndex) className += ' correct'; else if (idx === selectedAnswer && !answerResult.correct) className += ' incorrect'; }
+    else if (selectedAnswer === idx) className += ' selected';
     return className;
   };
 
-  // Color palette for players
   const playerColors = ['#06b6d4', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899'];
 
   return (
     <div className="container">
       <div className="quiz-container">
         <div className="quiz-header">
-          <div className="quiz-progress">
-            <span className="font-display" style={{ color: 'var(--accent-cyan)', fontWeight: '600' }}>
-              {questionIndex + 1}/{totalQuestions}
-            </span>
-            <div className="progress-bar">
-              <div
-                className="progress-fill"
-                style={{ width: `${((questionIndex + 1) / totalQuestions) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          <div className={`quiz-timer ${timeLeft <= 10 ? 'warning' : ''}`}>
-            {timeLeft}s
-          </div>
-
+          <div className="quiz-progress"><span className="font-display" style={{ color: 'var(--accent-cyan)', fontWeight: '600' }}>{questionIndex + 1}/{totalQuestions}</span><div className="progress-bar"><div className="progress-fill" style={{ width: `${((questionIndex + 1) / totalQuestions) * 100}%` }} /></div></div>
+          <div className={`quiz-timer ${timeLeft <= 10 ? 'warning' : ''}`}>{timeLeft}s</div>
           <div className="quiz-score">⭐ {score}</div>
         </div>
-
-        <div className="quiz-question-card">
-          <div className="question-number">Question {questionIndex + 1}</div>
-          <h2 className="question-text">{currentQuestion.question}</h2>
-        </div>
-
+        <div className="quiz-question-card"><div className="question-number">Question {questionIndex + 1}</div><h2 className="question-text">{currentQuestion.question}</h2></div>
         <div className="answer-options">
           {currentQuestion.options.map((option, idx) => (
-            <button
-              key={idx}
-              className={getOptionClass(idx)}
-              onClick={() => handleAnswer(idx)}
-              disabled={selectedAnswer !== null || answerResult}
-            >
-              <span className="answer-letter">{String.fromCharCode(65 + idx)}</span>
-              <span>{option}</span>
+            <button key={idx} className={getOptionClass(idx)} onClick={() => handleAnswer(idx)} disabled={selectedAnswer !== null || answerResult}>
+              <span className="answer-letter">{String.fromCharCode(65 + idx)}</span><span>{option}</span>
             </button>
           ))}
         </div>
-
         {answerResult && (
           <div style={{ textAlign: 'center', marginTop: '28px', padding: '20px', background: answerResult.correct ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
-            <div style={{
-              fontSize: '1.4rem',
-              fontWeight: '700',
-              color: answerResult.correct ? 'var(--success)' : 'var(--error)',
-              marginBottom: '8px'
-            }}>
-              {answerResult.correct ? '✅ Correct!' : '❌ Wrong!'}
-            </div>
-            <div style={{ color: 'var(--accent-gold)', fontWeight: '600', fontSize: '1.1rem' }}>
-              +{answerResult.points} points
-            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: '700', color: answerResult.correct ? 'var(--success)' : 'var(--error)', marginBottom: '8px' }}>{answerResult.correct ? '✅ Correct!' : '❌ Wrong!'}</div>
+            <div style={{ color: 'var(--accent-gold)', fontWeight: '600', fontSize: '1.1rem' }}>+{answerResult.points} points</div>
           </div>
         )}
       </div>
-
-      {/* Live Scoreboard */}
       <div className="live-scoreboard">
-        <div className="scoreboard-title">
-          <span className="live-indicator"></span>
-          Live Scores
-        </div>
-        {players
-          .sort((a, b) => b.score - a.score)
-          .map((player, idx) => (
-            <div
-              key={player.id}
-              className={`scoreboard-player ${player.id === gameData.playerId ? 'you' : ''} ${idx === 0 ? 'first' : ''}`}
-            >
-              <span className={`scoreboard-rank ${idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''}`}>
-                #{idx + 1}
-              </span>
-              <div className="scoreboard-avatar" style={{ background: player.color || playerColors[idx % playerColors.length] }}>
-                {player.avatar}
-              </div>
-              <span className="scoreboard-name">
-                {player.id === gameData.playerId ? 'You' : player.name}
-              </span>
-              <span className="scoreboard-score">{player.score}</span>
-            </div>
-          ))}
+        <div className="scoreboard-title"><span className="live-indicator"></span>Live Scores</div>
+        {players.sort((a, b) => b.score - a.score).map((player, idx) => (
+          <div key={player.id} className={`scoreboard-player ${player.id === gameData.playerId ? 'you' : ''} ${idx === 0 ? 'first' : ''}`}>
+            <span className={`scoreboard-rank ${idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''}`}>#{idx + 1}</span>
+            <div className="scoreboard-avatar" style={{ background: player.color || playerColors[idx % playerColors.length] }}>{player.avatar}</div>
+            <span className="scoreboard-name">{player.id === gameData.playerId ? 'You' : player.name}</span>
+            <span className="scoreboard-score">{player.score}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
 // Results Screen
-const ResultsScreen = ({ results, user, gameData, onPlayAgain, onHome }) => {
+const ResultsScreen = ({ results, user, gameData, onHome }) => {
   const myResult = results.find((r) => r.id === gameData.playerId);
   const myRank = results.findIndex((r) => r.id === gameData.playerId) + 1;
-
-  const getTrophy = () => {
-    if (myRank === 1) return '🏆';
-    if (myRank === 2) return '🥈';
-    if (myRank === 3) return '🥉';
-    return '🎮';
-  };
-
-  const getPositionText = () => {
-    if (myRank === 1) return '1st Place';
-    if (myRank === 2) return '2nd Place';
-    if (myRank === 3) return '3rd Place';
-    return `${myRank}th Place`;
-  };
-
-  // Color palette for players
+  const getTrophy = () => { if (myRank === 1) return '🏆'; if (myRank === 2) return '🥈'; if (myRank === 3) return '🥉'; return '🎮'; };
+  const getPositionText = () => { if (myRank === 1) return '1st Place'; if (myRank === 2) return '2nd Place'; if (myRank === 3) return '3rd Place'; return `${myRank}th Place`; };
   const playerColors = ['#06b6d4', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899'];
 
   return (
@@ -1638,161 +1632,74 @@ const ResultsScreen = ({ results, user, gameData, onPlayAgain, onHome }) => {
       <div className="results-container">
         <div className="results-trophy">{getTrophy()}</div>
         <div className="results-position">{getPositionText()}</div>
-        <h1 className="results-title">
-          {myRank === 1 ? 'Victory!' : myRank <= 3 ? 'Great Job!' : 'Game Over!'}
-        </h1>
-
+        <h1 className="results-title">{myRank === 1 ? 'Victory!' : myRank <= 3 ? 'Great Job!' : 'Game Over!'}</h1>
         <div className="results-score-display">{myResult?.score || 0}</div>
-
         <div className="results-stats">
-          <div className="result-stat">
-            <div className="result-stat-value" style={{ color: 'var(--success)' }}>
-              {myResult?.correctAnswers || 0}
-            </div>
-            <div className="result-stat-label">Correct</div>
-          </div>
-          <div className="result-stat">
-            <div className="result-stat-value" style={{ color: 'var(--error)' }}>
-              {(gameData.totalQuestions || 10) - (myResult?.correctAnswers || 0)}
-            </div>
-            <div className="result-stat-label">Wrong</div>
-          </div>
-          <div className="result-stat">
-            <div className="result-stat-value" style={{ color: 'var(--accent-purple)' }}>
-              {myResult ? Math.round((myResult.correctAnswers / gameData.totalQuestions) * 100) : 0}%
-            </div>
-            <div className="result-stat-label">Accuracy</div>
-          </div>
+          <div className="result-stat"><div className="result-stat-value" style={{ color: 'var(--success)' }}>{myResult?.correctAnswers || 0}</div><div className="result-stat-label">Correct</div></div>
+          <div className="result-stat"><div className="result-stat-value" style={{ color: 'var(--error)' }}>{(gameData.totalQuestions || 10) - (myResult?.correctAnswers || 0)}</div><div className="result-stat-label">Wrong</div></div>
+          <div className="result-stat"><div className="result-stat-value" style={{ color: 'var(--accent-purple)' }}>{myResult ? Math.round((myResult.correctAnswers / gameData.totalQuestions) * 100) : 0}%</div><div className="result-stat-label">Accuracy</div></div>
         </div>
-
         <div className="final-leaderboard">
           <div className="final-leaderboard-title">🏅 Final Standings</div>
           {results.map((player, idx) => (
-            <div
-              key={player.id}
-              className={`scoreboard-player ${player.id === gameData.playerId ? 'you' : ''} ${idx === 0 ? 'first' : ''}`}
-            >
-              <span className={`scoreboard-rank ${idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''}`}>
-                #{idx + 1}
-              </span>
-              <div className="scoreboard-avatar" style={{ background: player.color || playerColors[idx % playerColors.length] }}>
-                {player.avatar}
-              </div>
-              <span className="scoreboard-name">
-                {player.name} {player.id === gameData.playerId && '(You)'}
-              </span>
+            <div key={player.id} className={`scoreboard-player ${player.id === gameData.playerId ? 'you' : ''} ${idx === 0 ? 'first' : ''}`}>
+              <span className={`scoreboard-rank ${idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''}`}>#{idx + 1}</span>
+              <div className="scoreboard-avatar" style={{ background: player.color || playerColors[idx % playerColors.length] }}>{player.avatar}</div>
+              <span className="scoreboard-name">{player.name} {player.id === gameData.playerId && '(You)'}</span>
               <span className="scoreboard-score">{player.score}</span>
             </div>
           ))}
         </div>
-
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-          <button className="btn btn-primary btn-lg" onClick={onHome}>
-            🏠 Home
-          </button>
-        </div>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}><button className="btn btn-primary btn-lg" onClick={onHome}>🏠 Home</button></div>
       </div>
     </div>
   );
 };
 
-// ==================== MAIN APP ====================
-export default function App() {
-  const [screen, setScreen] = useState('home'); // home, create, join, lobby, playing, results
+// ==================== MAIN APP CONTENT ====================
+function AppContent() {
+  const { user: authUser, token, isAuthenticated, loading: authLoading, logout } = useAuth();
+  const [screen, setScreen] = useState('auth');
   const [user, setUser] = useState(null);
   const [gameData, setGameData] = useState(null);
   const [results, setResults] = useState(null);
 
+  useEffect(() => { if (!authLoading) { setScreen(isAuthenticated ? 'dashboard' : 'auth'); } }, [isAuthenticated, authLoading]);
+
+  const handleAuthSuccess = () => setScreen('dashboard');
   const handleCreateGame = () => setScreen('create');
   const handleJoinGame = () => setScreen('join');
-  const handleBack = () => setScreen('home');
+  const handleBackToDashboard = () => setScreen('dashboard');
+  const handleGameCreated = (data) => { setUser({ name: data.name, avatar: data.avatar, color: '#06b6d4', isHost: true }); setGameData(data); setScreen('lobby'); };
+  const handleGameJoined = (data) => { setUser({ name: data.name, avatar: data.avatar, color: '#8b5cf6', isHost: false }); setGameData(data); setScreen('lobby'); };
+  const handleStartGame = () => setScreen('playing');
+  const handleGameEnd = (finalResults) => { setResults(finalResults); setScreen('results'); };
+  const handleLeave = () => { setUser(null); setGameData(null); setResults(null); setScreen('dashboard'); };
+  const handleLogout = () => { logout(); setUser(null); setGameData(null); setResults(null); setScreen('auth'); };
+  const handleLogoClick = () => { if (screen === 'playing') return; if (isAuthenticated) handleLeave(); };
 
-  const handleGameCreated = (data) => {
-    setUser({
-      name: data.name,
-      avatar: data.avatar,
-      color: '#06b6d4',
-      isHost: true,
-    });
-    setGameData(data);
-    setScreen('lobby');
-  };
-
-  const handleGameJoined = (data) => {
-    setUser({
-      name: data.name,
-      avatar: data.avatar,
-      color: '#8b5cf6',
-      isHost: false,
-    });
-    setGameData(data);
-    setScreen('lobby');
-  };
-
-  const handleStartGame = () => {
-    setScreen('playing');
-  };
-
-  const handleGameEnd = (finalResults) => {
-    setResults(finalResults);
-    setScreen('results');
-  };
-
-  const handleLeave = () => {
-    setUser(null);
-    setGameData(null);
-    setResults(null);
-    setScreen('home');
-  };
-
-  const handleLogoClick = () => {
-    if (screen === 'playing') return; // Don't allow leaving during game
-    handleLeave();
-  };
+  if (authLoading) return <><style>{styles}</style><div className="app-container"><div className="loading-container" style={{ minHeight: '100vh' }}><div className="loading-spinner"></div><div className="loading-text">Loading...</div></div></div></>;
 
   return (
-    <>
-      <style>{styles}</style>
+    <><style>{styles}</style>
       <div className="app-container">
-        <Navbar user={user} onLogoClick={handleLogoClick} />
-
-        <main className="main-content">
-          {screen === 'home' && (
-            <HomeScreen onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />
-          )}
-
-          {screen === 'create' && (
-            <CreateGameScreen onBack={handleBack} onGameCreated={handleGameCreated} />
-          )}
-
-          {screen === 'join' && (
-            <JoinGameScreen onBack={handleBack} onGameJoined={handleGameJoined} />
-          )}
-
-          {screen === 'lobby' && gameData && (
-            <GameLobby
-              gameData={gameData}
-              user={user}
-              onStartGame={handleStartGame}
-              onLeave={handleLeave}
-            />
-          )}
-
-          {screen === 'playing' && gameData && (
-            <QuizGame gameData={gameData} user={user} onGameEnd={handleGameEnd} />
-          )}
-
-          {screen === 'results' && results && (
-            <ResultsScreen
-              results={results}
-              user={user}
-              gameData={gameData}
-              onHome={handleLeave}
-            />
-          )}
+        {screen !== 'auth' && <Navbar user={user} authUser={authUser} onLogoClick={handleLogoClick} onLogout={handleLogout} />}
+        <main className={screen !== 'auth' ? 'main-content' : ''}>
+          {screen === 'auth' && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
+          {screen === 'dashboard' && <DashboardScreen onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />}
+          {screen === 'create' && <CreateGameScreen onBack={handleBackToDashboard} onGameCreated={handleGameCreated} authUser={authUser} token={token} />}
+          {screen === 'join' && <JoinGameScreen onBack={handleBackToDashboard} onGameJoined={handleGameJoined} authUser={authUser} />}
+          {screen === 'lobby' && gameData && <GameLobby gameData={gameData} user={user} onStartGame={handleStartGame} onLeave={handleLeave} />}
+          {screen === 'playing' && gameData && <QuizGame gameData={gameData} user={user} onGameEnd={handleGameEnd} />}
+          {screen === 'results' && results && <ResultsScreen results={results} user={user} gameData={gameData} onHome={handleLeave} />}
         </main>
       </div>
     </>
   );
+}
+
+// ==================== MAIN APP WITH AUTH PROVIDER ====================
+export default function App() {
+  return <AuthProvider><AppContent /></AuthProvider>;
 }
 
