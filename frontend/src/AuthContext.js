@@ -4,15 +4,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const AuthContext = createContext(null);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
@@ -20,7 +12,9 @@ export const AuthProvider = ({ children }) => {
   // Verify token on mount
   useEffect(() => {
     const verifyToken = async () => {
-      if (!token) {
+      const savedToken = localStorage.getItem('token');
+      
+      if (!savedToken) {
         setLoading(false);
         return;
       }
@@ -28,41 +22,47 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await fetch(`${API_URL}/auth/verify`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${savedToken}`
           }
         });
 
         if (response.ok) {
           const data = await response.json();
           setUser(data.user);
+          setToken(savedToken);
         } else {
-          // Token invalid - clear it
+          // Token invalid, clear it
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
         }
       } catch (error) {
         console.error('Token verification failed:', error);
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     verifyToken();
-  }, [token]);
+  }, []);
 
-  // Register new user
-  const register = async (email, password, username) => {
-    const response = await fetch(`${API_URL}/auth/register`, {
+  // Login
+  const login = async (email, password) => {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, username })
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Registration failed');
+      throw new Error(data.error || 'Login failed');
     }
 
     localStorage.setItem('token', data.token);
@@ -72,18 +72,20 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  // Login existing user
-  const login = async (email, password) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+  // Register
+  const register = async (email, password, username) => {
+    const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password, username })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Login failed');
+      throw new Error(data.error || 'Registration failed');
     }
 
     localStorage.setItem('token', data.token);
@@ -114,22 +116,21 @@ export const AuthProvider = ({ children }) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Profile update failed');
+      throw new Error(data.error || 'Update failed');
     }
 
-    setUser(prev => ({ ...prev, ...data.user }));
+    setUser(data.user);
     return data;
   };
 
-  // Fetch with auth header helper
+  // Authenticated fetch helper
   const authFetch = async (url, options = {}) => {
-    const response = await fetch(`${API_URL}${url}`, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    };
+
+    const response = await fetch(url, { ...options, headers });
     return response;
   };
 
@@ -137,9 +138,9 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
-    isAuthenticated: !!user,
-    register,
+    isAuthenticated: !!token && !!user,
     login,
+    register,
     logout,
     updateProfile,
     authFetch
@@ -150,6 +151,14 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
 
 export default AuthContext;
