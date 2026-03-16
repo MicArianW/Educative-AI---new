@@ -491,57 +491,61 @@ io.on("connection", (socket) => {
     setTimeout(() => { sendQuestion(normalizedId, 0); }, 3000);
   });
 
-  socket.on("submitAnswer", ({ gameId, playerId, questionIndex, answerIndex }) => {
-    const normalizedId = gameId?.toUpperCase();
-    const game = games[normalizedId];
-
-    if (!game || !game.players[playerId]) return;
-    if (game.status !== "playing") return;
-    if (questionIndex !== game.currentQuestion) return;
-
-    const player = game.players[playerId];
-    const question = game.questions[questionIndex];
-
-    if (player.answers[questionIndex] !== undefined) return;
-
-    const timeMs = Date.now() - game.questionStartTime;
-    const correct = answerIndex === question.correctIndex;
-    const points = calculateScore(timeMs, correct);
-
-    player.answers[questionIndex] = { answer: answerIndex, time: timeMs, correct, points };
-    player.score += points;
-
-    console.log(`📝 ${player.name} answered Q${questionIndex + 1}: ${correct ? "✅" : "❌"} (+${points})`);
-
-    socket.emit("answerResult", {
-      questionIndex, correct, correctIndex: question.correctIndex, points, totalScore: player.score,
-    });
-
-    broadcastGameState(normalizedId);
-
-    const allAnswered = Object.values(game.players).every((p) => p.answers[questionIndex] !== undefined);
-
-    if (allAnswered) {
-      setTimeout(() => {
-        const nextIndex = questionIndex + 1;
-        if (nextIndex < game.questions.length) {
-          sendQuestion(normalizedId, nextIndex);
-        } else {
-          game.status = "finished";
-          Object.values(game.players).forEach((p) => { p.finishedAt = Date.now(); });
-
-          const finalResults = Object.entries(game.players)
-            .map(([id, p]) => ({
-              id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
-              correctAnswers: p.answers.filter((a) => a?.correct).length,
-            }))
-            .sort((a, b) => b.score - a.score);
-
-          io.to(normalizedId).emit("gameFinished", { results: finalResults });
-          saveGameResults(normalizedId);
-          console.log(`🏁 Game ${normalizedId} finished!`);
-        }
-      }, 3000);
+  socket.on("submitAnswer", async ({ gameId, playerId, questionIndex, answerIndex }) => {
+    try {
+      const normalizedId = gameId?.toUpperCase();
+      const game = games[normalizedId];
+  
+      if (!game || !game.players[playerId]) return;
+      if (game.status !== "playing") return;
+      if (questionIndex !== game.currentQuestion) return;
+  
+      const player = game.players[playerId];
+      const question = game.questions[questionIndex];
+  
+      if (player.answers[questionIndex] !== undefined) return;
+  
+      const timeMs = Date.now() - game.questionStartTime;
+      const correct = answerIndex === question.correctIndex;
+      const points = calculateScore(timeMs, correct);
+  
+      player.answers[questionIndex] = { answer: answerIndex, time: timeMs, correct, points };
+      player.score += points;
+  
+      console.log(`📝 ${player.name} answered Q${questionIndex + 1}: ${correct ? "✅" : "❌"} (+${points})`);
+  
+      socket.emit("answerResult", {
+        questionIndex, correct, correctIndex: question.correctIndex, points, totalScore: player.score,
+      });
+  
+      broadcastGameState(normalizedId);
+  
+      const allAnswered = Object.values(game.players).every((p) => p.answers[questionIndex] !== undefined);
+  
+      if (allAnswered) {
+        setTimeout(() => {
+          const nextIndex = questionIndex + 1;
+          if (nextIndex < game.questions.length) {
+            sendQuestion(normalizedId, nextIndex);
+          } else {
+            game.status = "finished";
+            Object.values(game.players).forEach((p) => { p.finishedAt = Date.now(); });
+  
+            const finalResults = Object.entries(game.players)
+              .map(([id, p]) => ({
+                id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
+                correctAnswers: p.answers.filter((a) => a?.correct).length,
+              }))
+              .sort((a, b) => b.score - a.score);
+  
+            io.to(normalizedId).emit("gameFinished", { results: finalResults });
+            saveGameResults(normalizedId);
+            console.log(`🏁 Game ${normalizedId} finished!`);
+          }
+        }, 3000);
+      }
+    } catch (error) {
+      console.error("❌ submitAnswer error:", error);
     }
   });
 

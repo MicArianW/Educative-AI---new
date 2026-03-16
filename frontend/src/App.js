@@ -1151,7 +1151,7 @@ const Navbar = ({ user, authUser, onLogoClick, onLogout }) => (
 );
 
 // Auth Screen - Login/Register
-const AuthScreen = ({ onAuthSuccess }) => {
+const AuthScreen = ({ onAuthSuccess, setScreen }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1219,6 +1219,32 @@ const AuthScreen = ({ onAuthSuccess }) => {
             {loading ? '...' : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
+
+        {/* Guest Join Option */}
+        <div style={{ marginTop: '30px', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0' }}>
+            <div style={{ flex: 1, height: '1px', background: '#ccc' }}></div>
+            <span style={{ padding: '0 15px', color: '#888' }}>or</span>
+            <div style={{ flex: 1, height: '1px', background: '#ccc' }}></div>
+          </div>
+          <button
+            onClick={() => setScreen('join')}
+            style={{
+              width: '100%',
+              padding: '15px',
+              fontSize: '16px',
+              background: 'transparent',
+              border: '2px solid #00d4aa',
+              color: '#00d4aa',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontFamily: 'Outfit, sans-serif'
+            }}
+          >
+            🎮 Join Game as Guest
+          </button>
+        </div>
 
         <div className="auth-features">
           <p className="auth-features-title">Why join Educative AI?</p>
@@ -1534,7 +1560,7 @@ const GameCountdown = ({ onComplete }) => {
   return <div className="countdown-overlay"><div className="countdown-number">{count || 'GO!'}</div><div className="countdown-text">Get Ready!</div></div>;
 };
 
-// Active Quiz Game
+// Active Quiz Game - FIXED VERSION
 const QuizGame = ({ gameData, user, onGameEnd }) => {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(-1);
@@ -1547,25 +1573,65 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
   const [showCountdown, setShowCountdown] = useState(true);
   const timerRef = useRef(null);
 
+  // FIXED: Socket setup with proper room join and dependencies
   useEffect(() => {
     const socket = connectSocket();
-    socket.on('question', (data) => { setCurrentQuestion(data); setQuestionIndex(data.index); setTotalQuestions(data.total); setSelectedAnswer(null); setAnswerResult(null); setTimeLeft(data.timeLimit || 30); });
-    socket.on('answerResult', (result) => { setAnswerResult(result); setScore(result.totalScore); });
-    socket.on('questionEnded', (data) => { if (!answerResult) setAnswerResult({ correct: false, correctIndex: data.correctIndex, points: 0 }); });
+    
+    // IMPORTANT: Re-join the room when QuizGame mounts!
+    socket.emit('joinRoom', { gameId: gameData.gameId, playerId: gameData.playerId });
+    console.log('🎮 QuizGame mounted, joining room:', gameData.gameId);
+    
+    socket.on('question', (data) => { 
+      console.log('📨 Received question:', data.index);
+      setCurrentQuestion(data); 
+      setQuestionIndex(data.index); 
+      setTotalQuestions(data.total); 
+      setSelectedAnswer(null); 
+      setAnswerResult(null); 
+      setTimeLeft(data.timeLimit || 30); 
+    });
+    
+    socket.on('answerResult', (result) => { 
+      setAnswerResult(result); 
+      setScore(result.totalScore); 
+    });
+    
+    socket.on('questionEnded', (data) => { 
+      setAnswerResult(prev => prev || { correct: false, correctIndex: data.correctIndex, points: 0 }); 
+    });
+    
     socket.on('gameState', (state) => setPlayers(state.players || []));
     socket.on('gameFinished', (data) => onGameEnd(data.results));
-    return () => { socket.off('question'); socket.off('answerResult'); socket.off('questionEnded'); socket.off('gameState'); socket.off('gameFinished'); };
-  }, [onGameEnd, answerResult]);
+    
+    return () => { 
+      socket.off('question'); 
+      socket.off('answerResult'); 
+      socket.off('questionEnded'); 
+      socket.off('gameState'); 
+      socket.off('gameFinished'); 
+    };
+  }, [gameData.gameId, gameData.playerId, onGameEnd]);
 
+  // Timer effect
   useEffect(() => {
     if (showCountdown || !currentQuestion || answerResult) return;
-    timerRef.current = setInterval(() => { setTimeLeft((prev) => { if (prev <= 1) { clearInterval(timerRef.current); socket.emit('timeUp', { gameId: gameData.gameId, questionIndex: questionIndex }); return 0; } return prev - 1; }); }, 1000);
+    timerRef.current = setInterval(() => { 
+      setTimeLeft((prev) => { 
+        if (prev <= 1) { 
+          clearInterval(timerRef.current); 
+          socket.emit('timeUp', { gameId: gameData.gameId, questionIndex: questionIndex }); 
+          return 0; 
+        } 
+        return prev - 1; 
+      }); 
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [currentQuestion, showCountdown, answerResult, gameData.gameId, questionIndex]);
 
   const handleAnswer = (answerIndex) => {
     if (selectedAnswer !== null || answerResult) return;
-    setSelectedAnswer(answerIndex); clearInterval(timerRef.current);
+    setSelectedAnswer(answerIndex); 
+    clearInterval(timerRef.current);
     socket.emit('submitAnswer', { gameId: gameData.gameId, playerId: gameData.playerId, questionIndex: questionIndex, answerIndex: answerIndex });
   };
 
@@ -1664,17 +1730,32 @@ function AppContent() {
   const [gameData, setGameData] = useState(null);
   const [results, setResults] = useState(null);
 
-  useEffect(() => { if (!authLoading) { setScreen(isAuthenticated ? 'dashboard' : 'auth'); } }, [isAuthenticated, authLoading]);
+  useEffect(() => { 
+    if (!authLoading) { 
+      setScreen(isAuthenticated ? 'dashboard' : 'auth'); 
+    } 
+  }, [isAuthenticated, authLoading]);
 
   const handleAuthSuccess = () => setScreen('dashboard');
   const handleCreateGame = () => setScreen('create');
   const handleJoinGame = () => setScreen('join');
-  const handleBackToDashboard = () => setScreen('dashboard');
+  const handleBackToDashboard = () => {
+    if (isAuthenticated) {
+      setScreen('dashboard');
+    } else {
+      setScreen('auth');
+    }
+  };
   const handleGameCreated = (data) => { setUser({ name: data.name, avatar: data.avatar, color: '#06b6d4', isHost: true }); setGameData(data); setScreen('lobby'); };
   const handleGameJoined = (data) => { setUser({ name: data.name, avatar: data.avatar, color: '#8b5cf6', isHost: false }); setGameData(data); setScreen('lobby'); };
   const handleStartGame = () => setScreen('playing');
   const handleGameEnd = (finalResults) => { setResults(finalResults); setScreen('results'); };
-  const handleLeave = () => { setUser(null); setGameData(null); setResults(null); setScreen('dashboard'); };
+  const handleLeave = () => { 
+    setUser(null); 
+    setGameData(null); 
+    setResults(null); 
+    setScreen(isAuthenticated ? 'dashboard' : 'auth'); 
+  };
   const handleLogout = () => { logout(); setUser(null); setGameData(null); setResults(null); setScreen('auth'); };
   const handleLogoClick = () => { if (screen === 'playing') return; if (isAuthenticated) handleLeave(); };
 
@@ -1685,7 +1766,7 @@ function AppContent() {
       <div className="app-container">
         {screen !== 'auth' && <Navbar user={user} authUser={authUser} onLogoClick={handleLogoClick} onLogout={handleLogout} />}
         <main className={screen !== 'auth' ? 'main-content' : ''}>
-          {screen === 'auth' && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
+          {screen === 'auth' && <AuthScreen onAuthSuccess={handleAuthSuccess} setScreen={setScreen} />}
           {screen === 'dashboard' && <DashboardScreen onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />}
           {screen === 'create' && <CreateGameScreen onBack={handleBackToDashboard} onGameCreated={handleGameCreated} authUser={authUser} token={token} />}
           {screen === 'join' && <JoinGameScreen onBack={handleBackToDashboard} onGameJoined={handleGameJoined} authUser={authUser} />}
