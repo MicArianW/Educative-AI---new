@@ -60,15 +60,42 @@ const games = {};
 const socketToPlayer = {};
 
 /** Helper: call OpenAI to generate structured MCQ quiz */
-async function generateStructuredQuizFromText(text, numQuestions = 10) {
+async function generateStructuredQuizFromText(text, numQuestions = 10, difficulty = 'medium') {
   const clipped = text.replace(/\s+/g, " ").trim().slice(0, 8000);
+
+  // Difficulty-specific instructions
+  const difficultyGuide = {
+    easy: `
+DIFFICULTY: EASY
+- Focus on basic recall and simple facts directly stated in the text
+- Questions should test whether the reader remembers key terms and definitions
+- Answers should be straightforward with clearly wrong distractors
+- Avoid complex reasoning or application questions
+- Target: 80-90% of readers should answer correctly`,
+    medium: `
+DIFFICULTY: MEDIUM  
+- Balance between recall and understanding
+- Questions should test comprehension and ability to apply concepts
+- Include some questions that require connecting ideas
+- Distractors should be plausible but distinguishable
+- Target: 50-70% of readers should answer correctly`,
+    hard: `
+DIFFICULTY: HARD
+- Focus on analysis, evaluation, and critical thinking
+- Questions should require deeper understanding and inference
+- Include questions that connect multiple concepts
+- Distractors should be sophisticated and require careful consideration
+- Add some tricky questions with subtle distinctions
+- Target: 30-50% of readers should answer correctly`
+  };
 
   const prompt = `
 You are an educational quiz generator.
 
 Based ONLY on the text below, create EXACTLY ${numQuestions} multiple-choice questions.
 Each question must have 4 options labeled A, B, C, D.
-Make questions challenging but fair - test understanding, not memorization.
+
+${difficultyGuide[difficulty] || difficultyGuide.medium}
 
 Return STRICT JSON with this shape (no markdown, no extra text):
 
@@ -87,7 +114,7 @@ Rules:
 - "questions" array must have exactly ${numQuestions} items
 - "correctIndex" is 0-3 (index of correct answer in options array)
 - Questions should cover different parts of the text
-- Avoid trivial or obvious questions
+- Match the ${difficulty.toUpperCase()} difficulty level described above
 
 TEXT:
 ${clipped}
@@ -96,10 +123,10 @@ ${clipped}
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a JSON-only quiz generator. Output valid JSON with no markdown formatting." },
+      { role: "system", content: `You are a JSON-only quiz generator specializing in ${difficulty} difficulty educational questions. Output valid JSON with no markdown formatting.` },
       { role: "user", content: prompt },
     ],
-    temperature: 0.5,
+    temperature: difficulty === 'easy' ? 0.3 : difficulty === 'hard' ? 0.7 : 0.5,
     max_tokens: 4000,
   });
 
@@ -152,6 +179,7 @@ function broadcastGameState(gameId) {
     gameId,
     gameName: game.gameName,
     topic: game.topic,
+    difficulty: game.difficulty || 'medium',
     status: game.status,
     hostId: game.hostId,
     players: playersData,
@@ -247,8 +275,12 @@ app.get("/health", (req, res) => {
  */
 app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => {
   try {
-    const { hostName, gameName, numQuestions = 10 } = req.body;
+    const { hostName, gameName, numQuestions = 10, difficulty = 'medium' } = req.body;
     const userId = req.user.id;
+
+    // Validate difficulty
+    const validDifficulties = ['easy', 'medium', 'hard'];
+    const safeDifficulty = validDifficulties.includes(difficulty) ? difficulty : 'medium';
 
     if (!hostName) return res.status(400).json({ error: "Host name is required" });
     if (!gameName) return res.status(400).json({ error: "Game name is required" });
@@ -258,9 +290,9 @@ app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => 
     const text = (pdfData.text || "").trim();
     if (!text) return res.status(400).json({ error: "Could not extract text from PDF" });
 
-    console.log("🤖 Generating questions from PDF...");
-    const { topic, questions } = await generateStructuredQuizFromText(text, parseInt(numQuestions) || 10);
-    console.log(`✅ Generated ${questions.length} questions about "${topic}"`);
+    console.log(`🤖 Generating ${safeDifficulty.toUpperCase()} questions from PDF...`);
+    const { topic, questions } = await generateStructuredQuizFromText(text, parseInt(numQuestions) || 10, safeDifficulty);
+    console.log(`✅ Generated ${questions.length} ${safeDifficulty} questions about "${topic}"`);
 
     let gameId;
     do { gameId = generateGameId(); } while (games[gameId]);
@@ -271,9 +303,9 @@ app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => 
     let dbGameId = null;
     try {
       const gameResult = await pool.query(
-        `INSERT INTO games (game_code, name, topic, host_id, host_name, total_questions)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [gameId, gameName, topic, userId, hostName, questions.length]
+        `INSERT INTO games (game_code, name, topic, host_id, host_name, total_questions, difficulty)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [gameId, gameName, topic, userId, hostName, questions.length, safeDifficulty]
       );
       dbGameId = gameResult.rows[0].id;
 
@@ -291,6 +323,7 @@ app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => 
         [dbGameId, userId, hostName, playerId]
       );
 
+
       await pool.query('UPDATE users SET games_hosted = games_hosted + 1 WHERE id = $1', [userId]);
       console.log(`💾 Game ${gameId} saved to database`);
     } catch (dbError) {
@@ -304,6 +337,7 @@ app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => 
       hostName,
       gameName,
       topic,
+      difficulty: safeDifficulty,
       status: "waiting",
       questions,
       currentQuestion: -1,
@@ -324,9 +358,9 @@ app.post("/game/create", verifyToken, upload.single("pdf"), async (req, res) => 
       },
     };
 
-    console.log(`🎮 Game ${gameId} created by ${hostName} (user: ${userId})`);
+    console.log(`🎮 Game ${gameId} created by ${hostName} (user: ${userId}) - ${safeDifficulty} difficulty`);
 
-    res.json({ gameId, playerId, gameName, topic, totalQuestions: questions.length });
+    res.json({ gameId, playerId, gameName, topic, difficulty: safeDifficulty, totalQuestions: questions.length });
   } catch (error) {
     console.error("❌ /game/create error:", error);
     res.status(500).json({ error: "Failed to create game", details: error.message });
@@ -440,22 +474,19 @@ app.get("/game/:gameId/results", (req, res) => {
   res.json({ gameId, gameName: game.gameName, topic: game.topic, results });
 });
 
-/* ==================== NEW ENDPOINTS FOR DASHBOARD FEATURES ==================== */
+// ==================== NEW ENDPOINTS FOR DASHBOARD FEATURES ====================
 
-/**
- * GET /dashboard/game-details/:gameId
- * Returns detailed info about a game including players and questions
- */
+// GET /dashboard/game-details/:gameId - Get detailed game info (players, questions)
 app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
   try {
-    const gameId = parseInt(req.params.gameId);
+    const gameId = req.params.gameId;
     const userId = req.user.id;
 
     // Get game info
     const gameResult = await pool.query(
-      `SELECT g.*, u.username as host_username
-       FROM games g
-       LEFT JOIN users u ON g.host_id = u.id
+      `SELECT g.*, 
+              (SELECT COUNT(*) FROM game_players WHERE game_id = g.id) as player_count
+       FROM games g 
        WHERE g.id = $1`,
       [gameId]
     );
@@ -468,7 +499,8 @@ app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
 
     // Get all players in this game
     const playersResult = await pool.query(
-      `SELECT gp.*, u.username
+      `SELECT gp.player_name, gp.score, gp.correct_answers, gp.total_answers, gp.final_rank, gp.is_host,
+              u.username
        FROM game_players gp
        LEFT JOIN users u ON gp.user_id = u.id
        WHERE gp.game_id = $1
@@ -476,7 +508,7 @@ app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
       [gameId]
     );
 
-    // Get all questions for this game
+    // Get questions for this game
     const questionsResult = await pool.query(
       `SELECT question_index, question_text, options, correct_index
        FROM questions
@@ -485,23 +517,13 @@ app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
       [gameId]
     );
 
-    const players = playersResult.rows.map(p => ({
-      id: p.player_id,
-      name: p.player_name,
-      username: p.username,
-      isHost: p.is_host,
-      score: p.score || 0,
-      correctAnswers: p.correct_answers || 0,
-      totalAnswers: p.total_answers || 0,
-      rank: p.final_rank
-    }));
-
-    const questions = questionsResult.rows.map(q => ({
-      index: q.question_index,
-      question: q.question_text,
-      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-      correctIndex: q.correct_index
-    }));
+    // Check if user played this game
+    const userAnswersResult = await pool.query(
+      `SELECT gp.player_id
+       FROM game_players gp
+       WHERE gp.game_id = $1 AND gp.user_id = $2`,
+      [gameId, userId]
+    );
 
     res.json({
       game: {
@@ -509,15 +531,29 @@ app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
         name: game.name,
         topic: game.topic,
         gameCode: game.game_code,
-        hostName: game.host_name,
-        hostUsername: game.host_username,
         status: game.status,
         totalQuestions: game.total_questions,
+        playerCount: game.player_count,
         createdAt: game.created_at,
-        finishedAt: game.finished_at
+        finishedAt: game.finished_at,
+        hostName: game.host_name
       },
-      players,
-      questions
+      players: playersResult.rows.map(p => ({
+        name: p.player_name,
+        username: p.username,
+        score: p.score,
+        correctAnswers: p.correct_answers,
+        totalAnswers: p.total_answers,
+        rank: p.final_rank,
+        isHost: p.is_host
+      })),
+      questions: questionsResult.rows.map(q => ({
+        index: q.question_index,
+        question: q.question_text,
+        options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+        correctIndex: q.correct_index
+      })),
+      userPlayed: userAnswersResult.rows.length > 0
     });
   } catch (error) {
     console.error("❌ /dashboard/game-details error:", error);
@@ -525,31 +561,27 @@ app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
   }
 });
 
-/**
- * GET /dashboard/activity
- * Returns games played per day for the last 7 days
- */
+// GET /dashboard/activity - Get user activity for chart (last 7 days)
 app.get("/dashboard/activity", verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get games played per day for last 7 days
-    const result = await pool.query(
+    // Get games played per day for the last 7 days
+    const activityResult = await pool.query(
       `SELECT 
          DATE(gp.joined_at) as date,
-         COUNT(*) as games
+         COUNT(*) as games_count,
+         COALESCE(SUM(gp.score), 0) as total_score
        FROM game_players gp
-       JOIN games g ON gp.game_id = g.id
        WHERE gp.user_id = $1 
          AND gp.joined_at >= CURRENT_DATE - INTERVAL '6 days'
-         AND g.status = 'finished'
        GROUP BY DATE(gp.joined_at)
        ORDER BY date ASC`,
       [userId]
     );
 
-    // Create array for last 7 days
-    const activity = [];
+    // Create array for last 7 days with 0 for missing days
+    const days = [];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
     for (let i = 6; i >= 0; i--) {
@@ -558,24 +590,25 @@ app.get("/dashboard/activity", verifyToken, async (req, res) => {
       const dateStr = date.toISOString().split('T')[0];
       const dayName = dayNames[date.getDay()];
       
-      const found = result.rows.find(r => 
-        r.date.toISOString().split('T')[0] === dateStr
-      );
+      const found = activityResult.rows.find(r => {
+        const rowDate = new Date(r.date).toISOString().split('T')[0];
+        return rowDate === dateStr;
+      });
       
-      activity.push({
+      days.push({
         day: dayName,
         date: dateStr,
-        games: found ? parseInt(found.games) : 0
+        games: found ? parseInt(found.games_count) : 0,
+        score: found ? parseInt(found.total_score) : 0
       });
     }
 
-    res.json({ activity });
+    res.json({ activity: days });
   } catch (error) {
     console.error("❌ /dashboard/activity error:", error);
-    res.status(500).json({ error: "Failed to fetch activity data" });
+    res.status(500).json({ error: "Failed to fetch activity" });
   }
 });
-
 
 /* ==================== SOCKET.IO EVENTS ==================== */
 
