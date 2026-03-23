@@ -440,6 +440,143 @@ app.get("/game/:gameId/results", (req, res) => {
   res.json({ gameId, gameName: game.gameName, topic: game.topic, results });
 });
 
+/* ==================== NEW ENDPOINTS FOR DASHBOARD FEATURES ==================== */
+
+/**
+ * GET /dashboard/game-details/:gameId
+ * Returns detailed info about a game including players and questions
+ */
+app.get("/dashboard/game-details/:gameId", verifyToken, async (req, res) => {
+  try {
+    const gameId = parseInt(req.params.gameId);
+    const userId = req.user.id;
+
+    // Get game info
+    const gameResult = await pool.query(
+      `SELECT g.*, u.username as host_username
+       FROM games g
+       LEFT JOIN users u ON g.host_id = u.id
+       WHERE g.id = $1`,
+      [gameId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return res.status(404).json({ error: "Game not found" });
+    }
+
+    const game = gameResult.rows[0];
+
+    // Get all players in this game
+    const playersResult = await pool.query(
+      `SELECT gp.*, u.username
+       FROM game_players gp
+       LEFT JOIN users u ON gp.user_id = u.id
+       WHERE gp.game_id = $1
+       ORDER BY gp.final_rank ASC NULLS LAST, gp.score DESC`,
+      [gameId]
+    );
+
+    // Get all questions for this game
+    const questionsResult = await pool.query(
+      `SELECT question_index, question_text, options, correct_index
+       FROM questions
+       WHERE game_id = $1
+       ORDER BY question_index ASC`,
+      [gameId]
+    );
+
+    const players = playersResult.rows.map(p => ({
+      id: p.player_id,
+      name: p.player_name,
+      username: p.username,
+      isHost: p.is_host,
+      score: p.score || 0,
+      correctAnswers: p.correct_answers || 0,
+      totalAnswers: p.total_answers || 0,
+      rank: p.final_rank
+    }));
+
+    const questions = questionsResult.rows.map(q => ({
+      index: q.question_index,
+      question: q.question_text,
+      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+      correctIndex: q.correct_index
+    }));
+
+    res.json({
+      game: {
+        id: game.id,
+        name: game.name,
+        topic: game.topic,
+        gameCode: game.game_code,
+        hostName: game.host_name,
+        hostUsername: game.host_username,
+        status: game.status,
+        totalQuestions: game.total_questions,
+        createdAt: game.created_at,
+        finishedAt: game.finished_at
+      },
+      players,
+      questions
+    });
+  } catch (error) {
+    console.error("❌ /dashboard/game-details error:", error);
+    res.status(500).json({ error: "Failed to fetch game details" });
+  }
+});
+
+/**
+ * GET /dashboard/activity
+ * Returns games played per day for the last 7 days
+ */
+app.get("/dashboard/activity", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get games played per day for last 7 days
+    const result = await pool.query(
+      `SELECT 
+         DATE(gp.joined_at) as date,
+         COUNT(*) as games
+       FROM game_players gp
+       JOIN games g ON gp.game_id = g.id
+       WHERE gp.user_id = $1 
+         AND gp.joined_at >= CURRENT_DATE - INTERVAL '6 days'
+         AND g.status = 'finished'
+       GROUP BY DATE(gp.joined_at)
+       ORDER BY date ASC`,
+      [userId]
+    );
+
+    // Create array for last 7 days
+    const activity = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayName = dayNames[date.getDay()];
+      
+      const found = result.rows.find(r => 
+        r.date.toISOString().split('T')[0] === dateStr
+      );
+      
+      activity.push({
+        day: dayName,
+        date: dateStr,
+        games: found ? parseInt(found.games) : 0
+      });
+    }
+
+    res.json({ activity });
+  } catch (error) {
+    console.error("❌ /dashboard/activity error:", error);
+    res.status(500).json({ error: "Failed to fetch activity data" });
+  }
+});
+
+
 /* ==================== SOCKET.IO EVENTS ==================== */
 
 io.on("connection", (socket) => {

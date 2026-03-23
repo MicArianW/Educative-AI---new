@@ -990,6 +990,15 @@ const styles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+  }
+
+  .game-item:hover {
+    border-color: var(--accent-cyan);
+    background: white;
+    transform: translateX(4px);
   }
 
   .topic-chip {
@@ -1084,6 +1093,298 @@ const styles = `
     font-weight: 600;
   }
 
+  /* ==================== NEW: Modal Styles ==================== */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 24px;
+    padding: 32px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px;
+  }
+
+  .modal-close:hover {
+    color: var(--text-primary);
+  }
+
+  /* ==================== NEW: Activity Chart ==================== */
+  .activity-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 120px;
+    padding: 20px 10px 0;
+    gap: 12px;
+  }
+
+  .activity-bar-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+  }
+
+  .activity-bar {
+    width: 100%;
+    max-width: 40px;
+    background: var(--gradient-main);
+    border-radius: 8px 8px 0 0;
+    transition: height 0.3s ease;
+    min-height: 4px;
+  }
+
+  .activity-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-weight: 500;
+  }
+
+  .activity-value {
+    font-size: 11px;
+    color: var(--accent-cyan);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  /* ==================== NEW: Landing Page Styles ==================== */
+  .landing-page {
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .landing-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 60px;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+  }
+
+  .landing-hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 40px 80px;
+  }
+
+  .landing-hero-content {
+    max-width: 900px;
+  }
+
+  .landing-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    border-radius: 50px;
+    color: var(--accent-cyan);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 30px;
+  }
+
+  .landing-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 4rem;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    background: var(--gradient-main);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .landing-subtitle {
+    font-size: 1.4rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto 40px;
+    line-height: 1.6;
+  }
+
+  .landing-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .landing-features {
+    padding: 100px 40px;
+    background: white;
+  }
+
+  .landing-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .landing-feature-card {
+    padding: 40px 30px;
+    border-radius: 24px;
+    background: var(--bg-primary);
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
+  }
+
+  .landing-feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .landing-feature-icon {
+    font-size: 3.5rem;
+    margin-bottom: 20px;
+  }
+
+  .landing-feature-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+
+  .landing-feature-desc {
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .landing-section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 60px;
+    color: var(--text-primary);
+  }
+
+  .landing-how-it-works {
+    padding: 100px 40px;
+    background: linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%);
+  }
+
+  .landing-steps {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    max-width: 1000px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+  }
+
+  .landing-step {
+    text-align: center;
+    max-width: 250px;
+  }
+
+  .landing-step-number {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--gradient-main);
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+
+  .landing-step-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+
+  .landing-step-desc {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .landing-cta {
+    padding: 100px 40px;
+    background: var(--gradient-main);
+    text-align: center;
+  }
+
+  .landing-cta-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 20px;
+  }
+
+  .landing-cta-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+  }
+
+  .landing-cta .btn {
+    background: white;
+    color: var(--accent-cyan);
+    font-weight: 700;
+  }
+
+  .landing-cta .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  }
+
   /* Responsive */
   @media (max-width: 1200px) {
     .live-scoreboard { display: none; }
@@ -1092,6 +1393,7 @@ const styles = `
 
   @media (max-width: 768px) {
     .navbar { padding: 0 20px; }
+    .landing-nav { padding: 0 20px; }
     .container { padding: 0 20px; }
     .page-title { font-size: 2rem; }
     .quiz-question-card { padding: 28px; }
@@ -1100,6 +1402,10 @@ const styles = `
     .results-score-display { font-size: 4rem; }
     .results-stats { gap: 30px; }
     .countdown-number { font-size: 8rem; }
+    .landing-title { font-size: 2.5rem; }
+    .landing-subtitle { font-size: 1.1rem; }
+    .landing-steps { gap: 40px; }
+    .landing-section-title { font-size: 1.8rem; }
   }
 `;
 
@@ -1148,6 +1454,96 @@ const Navbar = ({ user, authUser, onLogoClick, onLogout }) => (
       )}
     </div>
   </nav>
+);
+
+// ==================== NEW: Landing Page ====================
+const LandingPage = ({ onGetStarted, onJoinGame }) => (
+  <div className="landing-page">
+    <nav className="landing-nav">
+      <div className="logo">
+        <div className="logo-icon">🧠</div>
+        EDUCATIVE AI
+      </div>
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button className="btn btn-secondary" onClick={onJoinGame}>Join Game</button>
+        <button className="btn btn-primary" onClick={onGetStarted}>Get Started</button>
+      </div>
+    </nav>
+
+    <section className="landing-hero">
+      <div className="landing-hero-content">
+        <div className="landing-badge">✨ AI-Powered Learning Platform</div>
+        <h1 className="landing-title">Turn Your PDFs Into<br />Multiplayer Quizzes</h1>
+        <p className="landing-subtitle">
+          Upload any study material and our AI instantly creates engaging quiz games. 
+          Challenge friends, track progress, and make learning fun!
+        </p>
+        <div className="landing-buttons">
+          <button className="btn btn-primary btn-lg" onClick={onGetStarted}>
+            🚀 Start Learning Free
+          </button>
+          <button className="btn btn-secondary btn-lg" onClick={onJoinGame}>
+            🎮 Join a Game
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section className="landing-features">
+      <h2 className="landing-section-title">Why Choose Educative AI?</h2>
+      <div className="landing-features-grid">
+        <div className="landing-feature-card">
+          <div className="landing-feature-icon">🤖</div>
+          <h3 className="landing-feature-title">AI Question Generation</h3>
+          <p className="landing-feature-desc">Upload any PDF and our AI creates challenging, relevant questions in seconds.</p>
+        </div>
+        <div className="landing-feature-card">
+          <div className="landing-feature-icon">👥</div>
+          <h3 className="landing-feature-title">Real-Time Multiplayer</h3>
+          <p className="landing-feature-desc">Compete with friends in real-time. See live scores and race to answer first!</p>
+        </div>
+        <div className="landing-feature-card">
+          <div className="landing-feature-icon">📊</div>
+          <h3 className="landing-feature-title">Track Progress</h3>
+          <p className="landing-feature-desc">View detailed stats, track your accuracy, and watch yourself improve over time.</p>
+        </div>
+        <div className="landing-feature-card">
+          <div className="landing-feature-icon">🏆</div>
+          <h3 className="landing-feature-title">Leaderboards</h3>
+          <p className="landing-feature-desc">Climb the global rankings and prove you're the ultimate quiz champion!</p>
+        </div>
+      </div>
+    </section>
+
+    <section className="landing-how-it-works">
+      <h2 className="landing-section-title">How It Works</h2>
+      <div className="landing-steps">
+        <div className="landing-step">
+          <div className="landing-step-number">1</div>
+          <h3 className="landing-step-title">Upload Your PDF</h3>
+          <p className="landing-step-desc">Any study material, textbook chapter, or notes</p>
+        </div>
+        <div className="landing-step">
+          <div className="landing-step-number">2</div>
+          <h3 className="landing-step-title">AI Creates Questions</h3>
+          <p className="landing-step-desc">Smart questions generated in seconds</p>
+        </div>
+        <div className="landing-step">
+          <div className="landing-step-number">3</div>
+          <h3 className="landing-step-title">Share & Compete</h3>
+          <p className="landing-step-desc">Invite friends with a simple game code</p>
+        </div>
+      </div>
+    </section>
+
+    <section className="landing-cta">
+      <h2 className="landing-cta-title">Ready to Transform Your Learning?</h2>
+      <p className="landing-cta-subtitle">Join thousands of students already using Educative AI</p>
+      <button className="btn btn-lg" onClick={onGetStarted}>
+        Get Started — It's Free
+      </button>
+    </section>
+  </div>
 );
 
 // Auth Screen - Login/Register
@@ -1246,6 +1642,24 @@ const AuthScreen = ({ onAuthSuccess, setScreen }) => {
           </button>
         </div>
 
+        {/* Back to Landing */}
+        <button
+          onClick={() => setScreen('landing')}
+          style={{
+            width: '100%',
+            padding: '12px',
+            marginTop: '16px',
+            fontSize: '14px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            fontFamily: 'Outfit, sans-serif'
+          }}
+        >
+          ← Back to Home
+        </button>
+
         <div className="auth-features">
           <p className="auth-features-title">Why join Educative AI?</p>
           <div className="auth-features-list">
@@ -1260,7 +1674,192 @@ const AuthScreen = ({ onAuthSuccess, setScreen }) => {
   );
 };
 
-// Dashboard Screen
+// ==================== NEW: Activity Chart Component ====================
+const ActivityChart = ({ activity }) => {
+  const maxGames = Math.max(...activity.map(d => d.games), 1);
+  
+  return (
+    <div className="card" style={{ marginTop: '20px' }}>
+      <h3 className="card-title">📈 Weekly Activity</h3>
+      <div className="activity-chart">
+        {activity.map((day, idx) => (
+          <div key={idx} className="activity-bar-container">
+            <div className="activity-value">{day.games > 0 ? day.games : ''}</div>
+            <div 
+              className="activity-bar" 
+              style={{ 
+                height: `${(day.games / maxGames) * 80}px`,
+                opacity: day.games > 0 ? 1 : 0.3
+              }} 
+            />
+            <div className="activity-label">{day.day}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==================== NEW: Game Details Modal ====================
+const GameDetailsModal = ({ game, onClose, token }) => {
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('players');
+
+  useEffect(() => {
+    fetchGameDetails();
+  }, []);
+
+  const fetchGameDetails = async () => {
+    try {
+      const response = await fetch(`${API_URL}/dashboard/game-details/${game.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDetails(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch game details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="loading-container" style={{ padding: '40px' }}>
+            <div className="loading-spinner"></div>
+            <div className="loading-text">Loading game details...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h2 style={{ fontFamily: 'Orbitron', fontSize: '1.5rem', marginBottom: '8px' }}>
+              {details?.game?.name || game.name}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              📚 {details?.game?.topic || game.topic} • {details?.game?.totalQuestions || 10} questions
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
+              Code: {details?.game?.gameCode} • Host: {details?.game?.hostName}
+            </p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="dashboard-tabs" style={{ marginBottom: '20px' }}>
+          <button 
+            className={`dashboard-tab ${activeTab === 'players' ? 'active' : 'inactive'}`}
+            onClick={() => setActiveTab('players')}
+          >
+            👥 Players ({details?.players?.length || 0})
+          </button>
+          <button 
+            className={`dashboard-tab ${activeTab === 'questions' ? 'active' : 'inactive'}`}
+            onClick={() => setActiveTab('questions')}
+          >
+            ❓ Questions
+          </button>
+        </div>
+
+        {activeTab === 'players' && (
+          <div>
+            {details?.players?.map((player, idx) => (
+              <div key={idx} className="game-item" style={{ cursor: 'default' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ 
+                    width: '40px', 
+                    height: '40px', 
+                    borderRadius: '50%', 
+                    background: 'var(--gradient-main)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: '600'
+                  }}>
+                    {player.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600' }}>
+                      {player.name}
+                      {player.isHost && <span style={{ color: 'var(--accent-gold)', marginLeft: '8px' }}>👑 Host</span>}
+                    </div>
+                    {player.username && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>@{player.username}</div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: '700', color: 'var(--accent-purple)', fontFamily: 'Orbitron' }}>
+                    {player.rank ? `#${player.rank}` : '-'}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {player.score || 0} pts • {player.correctAnswers || 0}/{player.totalAnswers || 0}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'questions' && (
+          <div>
+            {details?.questions?.map((q, idx) => (
+              <div key={idx} style={{ 
+                padding: '16px', 
+                background: 'var(--bg-input)', 
+                borderRadius: '12px', 
+                marginBottom: '12px' 
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '12px' }}>
+                  <span style={{ color: 'var(--accent-cyan)', marginRight: '8px' }}>Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {q.options?.map((opt, optIdx) => (
+                    <div 
+                      key={optIdx} 
+                      style={{ 
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: optIdx === q.correctIndex ? 'rgba(16, 185, 129, 0.15)' : 'white',
+                        border: optIdx === q.correctIndex ? '2px solid var(--success)' : '1px solid var(--border-color)',
+                        color: optIdx === q.correctIndex ? 'var(--success)' : 'var(--text-primary)',
+                        fontWeight: optIdx === q.correctIndex ? '600' : '400'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px', opacity: 0.6 }}>{String.fromCharCode(65 + optIdx)}.</span>
+                      {opt}
+                      {optIdx === q.correctIndex && <span style={{ marginLeft: '8px' }}>✓</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="btn btn-secondary btn-block" style={{ marginTop: '20px' }} onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Dashboard Screen - UPDATED with clickable games and activity chart
 const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
   const { user: authUser, token } = useAuth();
   const [stats, setStats] = useState(null);
@@ -1268,8 +1867,10 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
   const [gamesCreated, setGamesCreated] = useState([]);
   const [topics, setTopics] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [activity, setActivity] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [selectedGame, setSelectedGame] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -1278,18 +1879,20 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
   const fetchDashboardData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [statsRes, playedRes, createdRes, topicsRes, leaderboardRes] = await Promise.all([
+      const [statsRes, playedRes, createdRes, topicsRes, leaderboardRes, activityRes] = await Promise.all([
         fetch(`${API_URL}/dashboard/stats`, { headers }),
-        fetch(`${API_URL}/dashboard/games-played?limit=5`, { headers }),
-        fetch(`${API_URL}/dashboard/games-created?limit=5`, { headers }),
+        fetch(`${API_URL}/dashboard/games-played?limit=10`, { headers }),
+        fetch(`${API_URL}/dashboard/games-created?limit=10`, { headers }),
         fetch(`${API_URL}/dashboard/topics`, { headers }),
-        fetch(`${API_URL}/dashboard/leaderboard?limit=10`)
+        fetch(`${API_URL}/dashboard/leaderboard?limit=10`),
+        fetch(`${API_URL}/dashboard/activity`, { headers }).catch(() => ({ ok: false }))
       ]);
       if (statsRes.ok) setStats(await statsRes.json());
       if (playedRes.ok) setGamesPlayed((await playedRes.json()).games || []);
       if (createdRes.ok) setGamesCreated((await createdRes.json()).games || []);
       if (topicsRes.ok) setTopics((await topicsRes.json()).topics || []);
       if (leaderboardRes.ok) setLeaderboard((await leaderboardRes.json()).leaderboard || []);
+      if (activityRes.ok) setActivity((await activityRes.json()).activity || []);
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
     } finally {
@@ -1336,8 +1939,8 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
             <>
               <div className="card" style={{ marginBottom: '20px' }}>
                 <h3 className="card-title">🎮 Recent Games</h3>
-                {gamesPlayed.length > 0 ? gamesPlayed.map((game, idx) => (
-                  <div key={idx} className="game-item">
+                {gamesPlayed.length > 0 ? gamesPlayed.slice(0, 5).map((game, idx) => (
+                  <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
                     <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic}</div></div>
                     <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
                   </div>
@@ -1353,7 +1956,7 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
             <div className="card">
               <h3 className="card-title">📝 Games You Created</h3>
               {gamesCreated.length > 0 ? gamesCreated.map((game, idx) => (
-                <div key={idx} className="game-item">
+                <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
                   <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Code: {game.game_code}</div></div>
                   <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '600', color: game.status === 'finished' ? 'var(--success)' : 'var(--accent-gold)' }}>{game.status}</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.player_count} players</div></div>
                 </div>
@@ -1364,7 +1967,7 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
             <div className="card">
               <h3 className="card-title">🎮 Game History</h3>
               {gamesPlayed.length > 0 ? gamesPlayed.map((game, idx) => (
-                <div key={idx} className="game-item">
+                <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
                   <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Rank: #{game.final_rank || '-'}</div></div>
                   <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
                 </div>
@@ -1384,6 +1987,9 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
               ))}
             </div>
           )}
+          
+          {/* NEW: Activity Chart */}
+          {activity.length > 0 && <ActivityChart activity={activity} />}
         </div>
         <div>
           <div className="card" style={{ marginBottom: '20px' }}>
@@ -1410,6 +2016,15 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
           </div>
         </div>
       </div>
+
+      {/* NEW: Game Details Modal */}
+      {selectedGame && (
+        <GameDetailsModal 
+          game={selectedGame} 
+          onClose={() => setSelectedGame(null)} 
+          token={token}
+        />
+      )}
     </div>
   );
 };
@@ -1560,7 +2175,7 @@ const GameCountdown = ({ onComplete }) => {
   return <div className="countdown-overlay"><div className="countdown-number">{count || 'GO!'}</div><div className="countdown-text">Get Ready!</div></div>;
 };
 
-// Active Quiz Game - FIXED VERSION
+// Active Quiz Game - YOUR ORIGINAL VERSION (kept intact)
 const QuizGame = ({ gameData, user, onGameEnd }) => {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(-1);
@@ -1612,7 +2227,7 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
     };
   }, [gameData.gameId, gameData.playerId, onGameEnd]);
 
-  // Timer effect
+  // Timer effect - YOUR ORIGINAL with socket.emit('timeUp')
   useEffect(() => {
     if (showCountdown || !currentQuestion || answerResult) return;
     timerRef.current = setInterval(() => { 
@@ -1722,28 +2337,33 @@ const ResultsScreen = ({ results, user, gameData, onHome }) => {
   );
 };
 
-// ==================== MAIN APP CONTENT ====================
+// ==================== MAIN APP CONTENT - UPDATED with landing page ====================
 function AppContent() {
   const { user: authUser, token, isAuthenticated, loading: authLoading, logout } = useAuth();
-  const [screen, setScreen] = useState('auth');
+  const [screen, setScreen] = useState('landing');
   const [user, setUser] = useState(null);
   const [gameData, setGameData] = useState(null);
   const [results, setResults] = useState(null);
 
   useEffect(() => { 
     if (!authLoading) { 
-      setScreen(isAuthenticated ? 'dashboard' : 'auth'); 
+      if (isAuthenticated) {
+        setScreen('dashboard');
+      } else if (screen !== 'join' && screen !== 'auth') {
+        setScreen('landing');
+      }
     } 
   }, [isAuthenticated, authLoading]);
 
   const handleAuthSuccess = () => setScreen('dashboard');
   const handleCreateGame = () => setScreen('create');
   const handleJoinGame = () => setScreen('join');
+  const handleGetStarted = () => setScreen('auth');
   const handleBackToDashboard = () => {
     if (isAuthenticated) {
       setScreen('dashboard');
     } else {
-      setScreen('auth');
+      setScreen('landing');
     }
   };
   const handleGameCreated = (data) => { setUser({ name: data.name, avatar: data.avatar, color: '#06b6d4', isHost: true }); setGameData(data); setScreen('lobby'); };
@@ -1754,18 +2374,19 @@ function AppContent() {
     setUser(null); 
     setGameData(null); 
     setResults(null); 
-    setScreen(isAuthenticated ? 'dashboard' : 'auth'); 
+    setScreen(isAuthenticated ? 'dashboard' : 'landing'); 
   };
-  const handleLogout = () => { logout(); setUser(null); setGameData(null); setResults(null); setScreen('auth'); };
-  const handleLogoClick = () => { if (screen === 'playing') return; if (isAuthenticated) handleLeave(); };
+  const handleLogout = () => { logout(); setUser(null); setGameData(null); setResults(null); setScreen('landing'); };
+  const handleLogoClick = () => { if (screen === 'playing') return; if (isAuthenticated) handleLeave(); else setScreen('landing'); };
 
   if (authLoading) return <><style>{styles}</style><div className="app-container"><div className="loading-container" style={{ minHeight: '100vh' }}><div className="loading-spinner"></div><div className="loading-text">Loading...</div></div></div></>;
 
   return (
     <><style>{styles}</style>
       <div className="app-container">
-        {screen !== 'auth' && <Navbar user={user} authUser={authUser} onLogoClick={handleLogoClick} onLogout={handleLogout} />}
-        <main className={screen !== 'auth' ? 'main-content' : ''}>
+        {screen !== 'auth' && screen !== 'landing' && <Navbar user={user} authUser={authUser} onLogoClick={handleLogoClick} onLogout={handleLogout} />}
+        <main className={screen !== 'auth' && screen !== 'landing' ? 'main-content' : ''}>
+          {screen === 'landing' && <LandingPage onGetStarted={handleGetStarted} onJoinGame={handleJoinGame} />}
           {screen === 'auth' && <AuthScreen onAuthSuccess={handleAuthSuccess} setScreen={setScreen} />}
           {screen === 'dashboard' && <DashboardScreen onCreateGame={handleCreateGame} onJoinGame={handleJoinGame} />}
           {screen === 'create' && <CreateGameScreen onBack={handleBackToDashboard} onGameCreated={handleGameCreated} authUser={authUser} token={token} />}
