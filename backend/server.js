@@ -188,6 +188,45 @@ function broadcastGameState(gameId) {
   });
 }
 
+/** Helper: advance to next question or finish game */
+function advanceToNextQuestion(gameId, currentIndex) {
+  const game = games[gameId];
+  if (!game || game.status !== "playing") return;
+  
+  // Prevent double-advance
+  if (game.lastAdvancedQuestion >= currentIndex + 1) return;
+  game.lastAdvancedQuestion = currentIndex + 1;
+
+  // Mark unanswered players
+  Object.values(game.players).forEach((player) => {
+    if (player.answers[currentIndex] === undefined) {
+      player.answers[currentIndex] = { answer: -1, time: 30000, correct: false, points: 0 };
+    }
+  });
+
+  const question = game.questions[currentIndex];
+  io.to(gameId).emit("questionEnded", { questionIndex: currentIndex, correctIndex: question.correctIndex });
+
+  setTimeout(() => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < game.questions.length) {
+      sendQuestion(gameId, nextIndex);
+    } else {
+      game.status = "finished";
+      const finalResults = Object.entries(game.players)
+        .map(([id, p]) => ({
+          id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
+          correctAnswers: p.answers.filter((a) => a?.correct).length,
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      io.to(gameId).emit("gameFinished", { results: finalResults });
+      saveGameResults(gameId);
+      console.log(`🏁 Game ${gameId} finished!`);
+    }
+  }, 3000);
+}
+
 /** Helper: send question */
 function sendQuestion(gameId, questionIndex) {
   const game = games[gameId];
@@ -739,14 +778,14 @@ io.on("connection", (socket) => {
   
       if (!game || !game.players[playerId]) return;
       if (game.status !== "playing") return;
-      if (questionIndex !== game.currentQuestion) return;
   
       const player = game.players[playerId];
       const question = game.questions[questionIndex];
   
+      // Check if already answered this question
       if (player.answers[questionIndex] !== undefined) return;
   
-      const timeMs = Date.now() - game.questionStartTime;
+      const timeMs = Date.now() - (player.questionStartTime || game.questionStartTime);
       const correct = answerIndex === question.correctIndex;
       const points = calculateScore(timeMs, correct);
   
@@ -755,75 +794,133 @@ io.on("connection", (socket) => {
   
       console.log(`📝 ${player.name} answered Q${questionIndex + 1}: ${correct ? "✅" : "❌"} (+${points})`);
   
+      // Send result to the player who answered
       socket.emit("answerResult", {
         questionIndex, correct, correctIndex: question.correctIndex, points, totalScore: player.score,
       });
   
-      broadcastGameState(normalizedId);
-  
-      const allAnswered = Object.values(game.players).every((p) => p.answers[questionIndex] !== undefined);
-  
-      if (allAnswered) {
+      // Immediately send next question to THIS player (not waiting for others)
+      const nextIndex = questionIndex + 1;
+      if (nextIndex < game.questions.length) {
+        // Small delay to show result, then send next question to this player only
         setTimeout(() => {
-          const nextIndex = questionIndex + 1;
-          if (nextIndex < game.questions.length) {
-            sendQuestion(normalizedId, nextIndex);
-          } else {
-            game.status = "finished";
-            Object.values(game.players).forEach((p) => { p.finishedAt = Date.now(); });
+          const nextQ = game.questions[nextIndex];
+          player.currentQuestion = nextIndex;
+          player.questionStartTime = Date.now();
+          
+          socket.emit("question", {
+            index: nextIndex,
+            total: game.questions.length,
+            question: nextQ.question,
+            options: nextQ.options,
+            timeLimit: 30,
+          });
+        }, 2000);
+      } else {
+        // This player finished all questions
+        player.finishedAt = Date.now();
+        console.log(`🏁 ${player.name} finished all questions!`);
+        
+        // Check if ALL players have finished
+        const allFinished = Object.values(game.players).every((p) => p.finishedAt);
+        
+        if (allFinished) {
+          game.status = "finished";
+          const finalResults = Object.entries(game.players)
+            .map(([id, p]) => ({
+              id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
+              correctAnswers: p.answers.filter((a) => a?.correct).length,
+            }))
+            .sort((a, b) => b.score - a.score);
   
-            const finalResults = Object.entries(game.players)
-              .map(([id, p]) => ({
-                id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
-                correctAnswers: p.answers.filter((a) => a?.correct).length,
-              }))
-              .sort((a, b) => b.score - a.score);
-  
-            io.to(normalizedId).emit("gameFinished", { results: finalResults });
-            saveGameResults(normalizedId);
-            console.log(`🏁 Game ${normalizedId} finished!`);
-          }
-        }, 3000);
+          io.to(normalizedId).emit("gameFinished", { results: finalResults });
+          saveGameResults(normalizedId);
+          console.log(`🏁 Game ${normalizedId} finished!`);
+        } else {
+          // Tell this player to wait for others
+          socket.emit("waitingForOthers", { 
+            message: "You finished! Waiting for other players...",
+            yourScore: player.score,
+            yourCorrect: player.answers.filter((a) => a?.correct).length
+          });
+        }
       }
+  
+      broadcastGameState(normalizedId);
     } catch (error) {
       console.error("❌ submitAnswer error:", error);
     }
   });
 
-  socket.on("timeUp", ({ gameId, questionIndex }) => {
+  socket.on("timeUp", ({ gameId, playerId, questionIndex }) => {
     const normalizedId = gameId?.toUpperCase();
     const game = games[normalizedId];
 
     if (!game || game.status !== "playing") return;
-    if (questionIndex !== game.currentQuestion) return;
-
-    Object.values(game.players).forEach((player) => {
-      if (player.answers[questionIndex] === undefined) {
-        player.answers[questionIndex] = { answer: -1, time: 30000, correct: false, points: 0 };
-      }
-    });
+    
+    // Get the player from socket mapping if playerId not provided
+    const mapping = socketToPlayer[socket.id];
+    const actualPlayerId = playerId || mapping?.playerId;
+    
+    if (!actualPlayerId || !game.players[actualPlayerId]) return;
+    
+    const player = game.players[actualPlayerId];
+    
+    // Mark as unanswered if they didn't answer
+    if (player.answers[questionIndex] === undefined) {
+      player.answers[questionIndex] = { answer: -1, time: 30000, correct: false, points: 0 };
+    }
 
     const question = game.questions[questionIndex];
-    io.to(normalizedId).emit("questionEnded", { questionIndex, correctIndex: question.correctIndex });
+    
+    // Tell this player the correct answer
+    socket.emit("questionEnded", { questionIndex, correctIndex: question.correctIndex });
 
+    // Move this player to next question
+    const nextIndex = questionIndex + 1;
     setTimeout(() => {
-      const nextIndex = questionIndex + 1;
       if (nextIndex < game.questions.length) {
-        sendQuestion(normalizedId, nextIndex);
+        const nextQ = game.questions[nextIndex];
+        player.currentQuestion = nextIndex;
+        player.questionStartTime = Date.now();
+        
+        socket.emit("question", {
+          index: nextIndex,
+          total: game.questions.length,
+          question: nextQ.question,
+          options: nextQ.options,
+          timeLimit: 30,
+        });
       } else {
-        game.status = "finished";
-        const finalResults = Object.entries(game.players)
-          .map(([id, p]) => ({
-            id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
-            correctAnswers: p.answers.filter((a) => a?.correct).length,
-          }))
-          .sort((a, b) => b.score - a.score);
+        // This player finished
+        player.finishedAt = Date.now();
+        console.log(`🏁 ${player.name} finished (time ran out on last question)`);
+        
+        const allFinished = Object.values(game.players).every((p) => p.finishedAt);
+        
+        if (allFinished) {
+          game.status = "finished";
+          const finalResults = Object.entries(game.players)
+            .map(([id, p]) => ({
+              id, name: p.name, avatar: p.avatar, color: p.color, score: p.score,
+              correctAnswers: p.answers.filter((a) => a?.correct).length,
+            }))
+            .sort((a, b) => b.score - a.score);
 
-        io.to(normalizedId).emit("gameFinished", { results: finalResults });
-        saveGameResults(normalizedId);
-        console.log(`🏁 Game ${normalizedId} finished!`);
+          io.to(normalizedId).emit("gameFinished", { results: finalResults });
+          saveGameResults(normalizedId);
+          console.log(`🏁 Game ${normalizedId} finished!`);
+        } else {
+          socket.emit("waitingForOthers", { 
+            message: "You finished! Waiting for other players...",
+            yourScore: player.score,
+            yourCorrect: player.answers.filter((a) => a?.correct).length
+          });
+        }
       }
-    }, 3000);
+      
+      broadcastGameState(normalizedId);
+    }, 2000);
   });
 
   socket.on("disconnect", () => {

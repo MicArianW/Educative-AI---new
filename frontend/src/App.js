@@ -2367,6 +2367,7 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
   const [timeLeft, setTimeLeft] = useState(30);
   const [players, setPlayers] = useState([]);
   const [showCountdown, setShowCountdown] = useState(true);
+  const [waitingForOthers, setWaitingForOthers] = useState(null);
   const timerRef = useRef(null);
 
   // FIXED: Socket setup with proper room join and dependencies
@@ -2399,12 +2400,18 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
     socket.on('gameState', (state) => setPlayers(state.players || []));
     socket.on('gameFinished', (data) => onGameEnd(data.results));
     
+    socket.on('waitingForOthers', (data) => {
+      console.log('⏳ Waiting for others:', data);
+      setWaitingForOthers(data);
+    });
+    
     return () => { 
       socket.off('question'); 
       socket.off('answerResult'); 
       socket.off('questionEnded'); 
       socket.off('gameState'); 
       socket.off('gameFinished'); 
+      socket.off('waitingForOthers');
     };
   }, [gameData.gameId, gameData.playerId, onGameEnd]);
 
@@ -2415,7 +2422,7 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
       setTimeLeft((prev) => { 
         if (prev <= 1) { 
           clearInterval(timerRef.current); 
-          socket.emit('timeUp', { gameId: gameData.gameId, questionIndex: questionIndex }); 
+          socket.emit('timeUp', { gameId: gameData.gameId, playerId: gameData.playerId, questionIndex: questionIndex }); 
           return 0; 
         } 
         return prev - 1; 
@@ -2432,6 +2439,31 @@ const QuizGame = ({ gameData, user, onGameEnd }) => {
   };
 
   if (showCountdown) return <GameCountdown onComplete={() => setShowCountdown(false)} />;
+  
+  // Show waiting screen when player finished all questions
+  if (waitingForOthers) {
+    return (
+      <div className="container">
+        <div className="card" style={{ textAlign: 'center', padding: '60px 40px', maxWidth: '500px', margin: '0 auto' }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
+          <h2 style={{ fontFamily: 'Orbitron', fontSize: '1.8rem', marginBottom: '16px' }}>You Finished!</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '30px' }}>Waiting for other players to complete...</p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', marginBottom: '30px' }}>
+            <div>
+              <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--accent-purple)', fontFamily: 'Orbitron' }}>{waitingForOthers.yourScore}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Points</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '36px', fontWeight: '700', color: 'var(--success)', fontFamily: 'Orbitron' }}>{waitingForOthers.yourCorrect}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Correct</div>
+            </div>
+          </div>
+          <div className="loading-spinner" style={{ margin: '0 auto' }}></div>
+        </div>
+      </div>
+    );
+  }
+  
   if (!currentQuestion) return <div className="loading-container"><div className="loading-spinner"></div><div className="loading-text">Waiting for question...</div></div>;
 
   const getOptionClass = (idx) => {
