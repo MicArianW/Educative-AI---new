@@ -1871,6 +1871,7 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -1897,6 +1898,48 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
       console.error('Failed to fetch dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    // DD/MM/YYYY format for older dates
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleDeleteGame = async (e, gameId, isCreated = false) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this game? This will remove it from your history and adjust your stats.')) return;
+    
+    setDeleting(gameId);
+    try {
+      const response = await fetch(`${API_URL}/dashboard/delete-game/${gameId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        // Refresh dashboard data
+        await fetchDashboardData();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete game');
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete game');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -1941,8 +1984,29 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
                 <h3 className="card-title">🎮 Recent Games</h3>
                 {gamesPlayed.length > 0 ? gamesPlayed.slice(0, 5).map((game, idx) => (
                   <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
-                    <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic}</div></div>
-                    <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '600' }}>{game.name}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{formatDate(game.played_at || game.created_at)}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', marginRight: '12px' }}>
+                      <div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div>
+                    </div>
+                    <button 
+                      onClick={(e) => handleDeleteGame(e, game.game_id || game.id)} 
+                      disabled={deleting === (game.game_id || game.id)}
+                      style={{ 
+                        background: 'none', border: 'none', cursor: 'pointer', padding: '8px', 
+                        color: 'var(--text-muted)', fontSize: '16px', borderRadius: '8px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => e.target.style.color = 'var(--error)'}
+                      onMouseOut={(e) => e.target.style.color = 'var(--text-muted)'}
+                      title="Delete game"
+                    >
+                      {deleting === (game.game_id || game.id) ? '...' : '🗑️'}
+                    </button>
                   </div>
                 )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No games played yet. Join a game to get started!</p>}
               </div>
@@ -1957,8 +2021,29 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
               <h3 className="card-title">📝 Games You Created</h3>
               {gamesCreated.length > 0 ? gamesCreated.map((game, idx) => (
                 <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
-                  <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Code: {game.game_code}</div></div>
-                  <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '600', color: game.status === 'finished' ? 'var(--success)' : 'var(--accent-gold)' }}>{game.status}</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.player_count} players</div></div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600' }}>{game.name}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Code: {game.game_code}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{formatDate(game.created_at)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', marginRight: '12px' }}>
+                    <div style={{ fontWeight: '600', color: game.status === 'finished' ? 'var(--success)' : 'var(--accent-gold)' }}>{game.status}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.player_count} players</div>
+                  </div>
+                  <button 
+                    onClick={(e) => handleDeleteGame(e, game.id, true)} 
+                    disabled={deleting === game.id}
+                    style={{ 
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '8px', 
+                      color: 'var(--text-muted)', fontSize: '16px', borderRadius: '8px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.color = 'var(--error)'}
+                    onMouseOut={(e) => e.target.style.color = 'var(--text-muted)'}
+                    title="Delete game"
+                  >
+                    {deleting === game.id ? '...' : '🗑️'}
+                  </button>
                 </div>
               )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>You haven't created any games yet.</p>}
             </div>
@@ -1968,8 +2053,29 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
               <h3 className="card-title">🎮 Game History</h3>
               {gamesPlayed.length > 0 ? gamesPlayed.map((game, idx) => (
                 <div key={idx} className="game-item" onClick={() => setSelectedGame(game)}>
-                  <div><div style={{ fontWeight: '600' }}>{game.name}</div><div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Rank: #{game.final_rank || '-'}</div></div>
-                  <div style={{ textAlign: 'right' }}><div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div><div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div></div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600' }}>{game.name}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{game.topic} • Rank: #{game.final_rank || '-'}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{formatDate(game.played_at || game.created_at)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', marginRight: '12px' }}>
+                    <div style={{ fontWeight: '700', color: 'var(--accent-purple)' }}>{game.score} pts</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{game.correct_answers}/{game.total_questions || 10} correct</div>
+                  </div>
+                  <button 
+                    onClick={(e) => handleDeleteGame(e, game.game_id || game.id)} 
+                    disabled={deleting === (game.game_id || game.id)}
+                    style={{ 
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '8px', 
+                      color: 'var(--text-muted)', fontSize: '16px', borderRadius: '8px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.color = 'var(--error)'}
+                    onMouseOut={(e) => e.target.style.color = 'var(--text-muted)'}
+                    title="Delete game"
+                  >
+                    {deleting === (game.game_id || game.id) ? '...' : '🗑️'}
+                  </button>
                 </div>
               )) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No games in your history yet.</p>}
             </div>
@@ -2041,9 +2147,9 @@ const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
   const fileInputRef = useRef(null);
 
   const difficultyInfo = {
-    easy: { emoji: '🟢', label: 'Easy', desc: 'Basic recall & simple concepts' },
-    medium: { emoji: '🟡', label: 'Medium', desc: 'Understanding & application' },
-    hard: { emoji: '🔴', label: 'Hard', desc: 'Analysis & critical thinking' }
+    easy: { label: 'Easy', desc: 'Basic recall & simple concepts' },
+    medium: { label: 'Medium', desc: 'Understanding & application' },
+    hard: { label: 'Hard', desc: 'Analysis & critical thinking' }
   };
 
   const handleFileChange = (e) => {
@@ -2102,7 +2208,6 @@ const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
                     textAlign: 'center'
                   }}
                 >
-                  <div style={{ fontSize: '24px', marginBottom: '4px' }}>{info.emoji}</div>
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>{info.label}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{info.desc}</div>
                 </button>
@@ -2189,9 +2294,9 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
   const [copied, setCopied] = useState(false);
 
   const difficultyInfo = {
-    easy: { emoji: '🟢', label: 'Easy' },
-    medium: { emoji: '🟡', label: 'Medium' },
-    hard: { emoji: '🔴', label: 'Hard' }
+    easy: { label: 'Easy' },
+    medium: { label: 'Medium' },
+    hard: { label: 'Hard' }
   };
 
   useEffect(() => {
@@ -2218,7 +2323,7 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
         <p className="lobby-topic">📚 {gameData.topic}</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px' }}>
           <span style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{gameData.totalQuestions} questions</span>
-          <span style={{ fontWeight: '600' }}>{diffInfo.emoji} {diffInfo.label}</span>
+          <span style={{ fontWeight: '600' }}>{diffInfo.label}</span>
         </div>
       </div>
       <div className="game-code-display"><div className="game-code">{gameData.gameId}</div><div className="game-code-label">Share this code with friends</div><button className="btn btn-secondary" style={{ marginTop: '20px' }} onClick={copyCode}>{copied ? '✓ Copied!' : '📋 Copy Code'}</button></div>
