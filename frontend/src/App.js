@@ -2033,10 +2033,18 @@ const DashboardScreen = ({ onCreateGame, onJoinGame }) => {
 const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
   const [hostName, setHostName] = useState(authUser?.username || '');
   const [gameName, setGameName] = useState('');
+  const [difficulty, setDifficulty] = useState('medium');
+  const [numQuestions, setNumQuestions] = useState(10);
   const [pdfFile, setPdfFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+
+  const difficultyInfo = {
+    easy: { emoji: '🟢', label: 'Easy', desc: 'Basic recall & simple concepts' },
+    medium: { emoji: '🟡', label: 'Medium', desc: 'Understanding & application' },
+    hard: { emoji: '🔴', label: 'Hard', desc: 'Analysis & critical thinking' }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -2052,6 +2060,8 @@ const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
       const formData = new FormData();
       formData.append('hostName', hostName.trim());
       formData.append('gameName', gameName.trim());
+      formData.append('difficulty', difficulty);
+      formData.append('numQuestions', numQuestions);
       formData.append('pdf', pdfFile);
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2070,18 +2080,65 @@ const CreateGameScreen = ({ onBack, onGameCreated, authUser, token }) => {
         <form onSubmit={handleSubmit}>
           <div className="input-group"><label className="input-label">Your Name</label><input type="text" className="input" placeholder="Enter your name" value={hostName} onChange={(e) => setHostName(e.target.value)} maxLength={20} disabled={loading} /></div>
           <div className="input-group"><label className="input-label">Game Name</label><input type="text" className="input" placeholder="e.g., Biology Chapter 5 Quiz" value={gameName} onChange={(e) => setGameName(e.target.value)} maxLength={50} disabled={loading} /></div>
+          
+          {/* Difficulty Selection */}
+          <div className="input-group">
+            <label className="input-label">Difficulty Level</label>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              {Object.entries(difficultyInfo).map(([key, info]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setDifficulty(key)}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '16px 12px',
+                    borderRadius: '12px',
+                    border: difficulty === key ? '2px solid var(--accent-purple)' : '2px solid var(--border-color)',
+                    background: difficulty === key ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1))' : 'var(--bg-input)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
+                  }}
+                >
+                  <div style={{ fontSize: '24px', marginBottom: '4px' }}>{info.emoji}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>{info.label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{info.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Number of Questions */}
+          <div className="input-group">
+            <label className="input-label">Number of Questions</label>
+            <select 
+              className="input" 
+              value={numQuestions} 
+              onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+              disabled={loading}
+              style={{ cursor: 'pointer' }}
+            >
+              <option value={5}>5 Questions (~2 min)</option>
+              <option value={10}>10 Questions (~5 min)</option>
+              <option value={15}>15 Questions (~7 min)</option>
+              <option value={20}>20 Questions (~10 min)</option>
+            </select>
+          </div>
+
           <div className="input-group">
             <label className="input-label">Upload Study Material (PDF)</label>
             <div className={`file-upload ${pdfFile ? 'has-file' : ''}`} onClick={() => fileInputRef.current?.click()}>
               <div className="file-upload-icon">{pdfFile ? '✅' : '📄'}</div>
               <div className="file-upload-text">{pdfFile ? 'PDF Selected!' : 'Click to upload PDF'}</div>
-              <div className="file-upload-hint">AI will generate quiz questions from this document</div>
+              <div className="file-upload-hint">AI will generate {numQuestions} {difficulty} questions from this document</div>
               {pdfFile && <div className="file-name">{pdfFile.name}</div>}
               <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileChange} style={{ display: 'none' }} disabled={loading} />
             </div>
           </div>
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={loading || !hostName.trim() || !gameName.trim() || !pdfFile}>
-            {loading ? <><span className="loading-spinner" style={{ width: 20, height: 20, marginBottom: 0, borderWidth: 3 }}></span>Generating Questions...</> : <>🎮 Create Game</>}
+            {loading ? <><span className="loading-spinner" style={{ width: 20, height: 20, marginBottom: 0, borderWidth: 3 }}></span>Generating {difficultyInfo[difficulty].label} Questions...</> : <>🎮 Create Game</>}
           </button>
         </form>
         <button className="btn btn-secondary btn-block" style={{ marginTop: '16px' }} onClick={onBack} disabled={loading}>← Back</button>
@@ -2131,6 +2188,12 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
   const [isReady, setIsReady] = useState(user.isHost);
   const [copied, setCopied] = useState(false);
 
+  const difficultyInfo = {
+    easy: { emoji: '🟢', label: 'Easy' },
+    medium: { emoji: '🟡', label: 'Medium' },
+    hard: { emoji: '🔴', label: 'Hard' }
+  };
+
   useEffect(() => {
     const socket = connectSocket();
     socket.emit('joinRoom', { gameId: gameData.gameId, playerId: gameData.playerId });
@@ -2145,10 +2208,19 @@ const GameLobby = ({ gameData, user, onStartGame, onLeave }) => {
   const copyCode = () => { navigator.clipboard.writeText(gameData.gameId); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const players = gameState?.players || gameData.players || [];
   const playerColors = ['#06b6d4', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899'];
+  const difficulty = gameState?.difficulty || gameData.difficulty || 'medium';
+  const diffInfo = difficultyInfo[difficulty] || difficultyInfo.medium;
 
   return (
     <div className="container-sm">
-      <div className="lobby-info"><h1 className="lobby-title">{gameData.gameName}</h1><p className="lobby-topic">📚 {gameData.topic}</p><p style={{ color: 'var(--text-muted)', marginTop: '8px', fontWeight: '500' }}>{gameData.totalQuestions} questions</p></div>
+      <div className="lobby-info">
+        <h1 className="lobby-title">{gameData.gameName}</h1>
+        <p className="lobby-topic">📚 {gameData.topic}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px' }}>
+          <span style={{ color: 'var(--text-muted)', fontWeight: '500' }}>{gameData.totalQuestions} questions</span>
+          <span style={{ fontWeight: '600' }}>{diffInfo.emoji} {diffInfo.label}</span>
+        </div>
+      </div>
       <div className="game-code-display"><div className="game-code">{gameData.gameId}</div><div className="game-code-label">Share this code with friends</div><button className="btn btn-secondary" style={{ marginTop: '20px' }} onClick={copyCode}>{copied ? '✓ Copied!' : '📋 Copy Code'}</button></div>
       <div className="card">
         <h3 className="card-title" style={{ marginBottom: '20px', textAlign: 'center' }}>👥 Players ({players.length})</h3>
