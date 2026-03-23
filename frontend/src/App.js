@@ -1741,17 +1741,34 @@ const GameDetailsModal = ({ game, onClose, token, onGameDeleted }) => {
     
     setDeleting(true);
     try {
-      const gameId = game.id || game.game_id;
-      const response = await fetch(`${API_URL}/dashboard/delete-game/${gameId}`, {
+      // Try multiple possible ID fields
+      const gameId = game.game_id || game.id || details?.game?.id;
+      console.log('Game object:', game);
+      console.log('Details object:', details);
+      console.log('Using gameId:', gameId);
+      
+      if (!gameId) {
+        alert('Could not determine game ID');
+        setDeleting(false);
+        return;
+      }
+      
+      const url = `${API_URL}/dashboard/delete-game/${gameId}`;
+      console.log('Fetching URL:', url);
+      
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      console.log('Response status:', response.status);
       
       if (response.ok) {
         onClose();
         if (onGameDeleted) onGameDeleted();
       } else {
         const data = await response.json();
+        console.log('Error response:', data);
         alert(data.error || 'Failed to delete game');
       }
     } catch (error) {

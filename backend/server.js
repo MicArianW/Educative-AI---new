@@ -610,6 +610,77 @@ app.get("/dashboard/activity", verifyToken, async (req, res) => {
   }
 });
 
+// DELETE /dashboard/delete-game/:gameId - Delete a game and adjust user stats
+app.delete("/dashboard/delete-game/:gameId", verifyToken, async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+    const userId = req.user.id;
+    
+    console.log(`🗑️ Delete request - gameId: ${gameId}, userId: ${userId}`);
+
+    // First, get the user's participation in this game
+    const participationResult = await pool.query(
+      `SELECT gp.score, gp.correct_answers, gp.total_answers, gp.final_rank, gp.is_host,
+              g.host_id
+       FROM game_players gp
+       JOIN games g ON gp.game_id = g.id
+       WHERE gp.game_id = $1 AND gp.user_id = $2`,
+      [gameId, userId]
+    );
+    
+    console.log(`🗑️ Participation found: ${participationResult.rows.length} rows`);
+
+    if (participationResult.rows.length === 0) {
+      return res.status(404).json({ error: "Game not found or you didn't participate in this game" });
+    }
+
+    const participation = participationResult.rows[0];
+    const wasWinner = participation.final_rank === 1;
+    const wasHost = participation.is_host;
+    const score = participation.score || 0;
+    const correctAnswers = participation.correct_answers || 0;
+    const totalAnswers = participation.total_answers || 0;
+
+    // Update user stats (subtract the game's contribution)
+    await pool.query(
+      `UPDATE users SET 
+        total_points = GREATEST(0, total_points - $1),
+        games_played = GREATEST(0, games_played - 1),
+        games_won = GREATEST(0, games_won - $2),
+        correct_answers = GREATEST(0, correct_answers - $3),
+        total_answers = GREATEST(0, total_answers - $4),
+        games_hosted = GREATEST(0, games_hosted - $5)
+       WHERE id = $6`,
+      [score, wasWinner ? 1 : 0, correctAnswers, totalAnswers, wasHost ? 1 : 0, userId]
+    );
+
+    // Delete the user's participation (not the entire game, in case others played)
+    await pool.query(
+      `DELETE FROM game_players WHERE game_id = $1 AND user_id = $2`,
+      [gameId, userId]
+    );
+
+    // Check if there are any players left in the game
+    const remainingPlayers = await pool.query(
+      `SELECT COUNT(*) FROM game_players WHERE game_id = $1`,
+      [gameId]
+    );
+
+    // If no players left, delete the game entirely
+    if (parseInt(remainingPlayers.rows[0].count) === 0) {
+      await pool.query(`DELETE FROM questions WHERE game_id = $1`, [gameId]);
+      await pool.query(`DELETE FROM games WHERE id = $1`, [gameId]);
+      console.log(`🗑️ Game ${gameId} fully deleted (no players remaining)`);
+    }
+
+    console.log(`🗑️ User ${userId} removed from game ${gameId}, stats adjusted`);
+    res.json({ success: true, message: "Game deleted and stats updated" });
+  } catch (error) {
+    console.error("❌ /dashboard/delete-game error:", error);
+    res.status(500).json({ error: "Failed to delete game" });
+  }
+});
+
 /* ==================== SOCKET.IO EVENTS ==================== */
 
 io.on("connection", (socket) => {
